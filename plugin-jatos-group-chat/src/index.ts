@@ -144,21 +144,25 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       listItem.style.color = color;
       historyElement.appendChild(listItem);
       historyContainer.scrollTop = historyContainer.scrollHeight;
-      if (!isEvent) {
-        this.trial_data.chat_log.push({
-          timestamp: new Date().toISOString(),
-          sender: this.jatos.groupMemberId,
-          message: text,
-          color: color
-        });
-      } else {
-        this.trial_data.chat_log.push({
-          timestamp: new Date().toISOString(),
-          sender: "system " + this.jatos.groupResultId,
-          message: text,
-          color: color
-        });
+      let curr_timestamp = new Date().toISOString();
+      let curr_chat_log = {
+        timestamp: curr_timestamp, 
+        message: text,
+        color: color
       }
+
+      if (!isEvent) {
+       curr_chat_log['sender'] = this.jatos.groupMemberId 
+       this.trial_data.chat_senders.push(this.jatos.groupMemberId)
+      } else {
+        curr_chat_log['sender'] = "system " + this.jatos.groupResultId,
+        this.trial_data.chat_senders.push("system " + this.jatos.groupResultId)
+      }
+
+      this.trial_data.chat_log.push(curr_chat_log);
+      this.trial_data.chat_timestamps.push(curr_timestamp); 
+      this.trial_data.chat_messages.push(text)
+    
     };
 
     const getTime = () => {
