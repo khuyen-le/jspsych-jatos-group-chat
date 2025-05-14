@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>jsPsychPluginJatosWaitingRoom Example</title>
+  <script src="https://unpkg.com/jspsych"></script>
+  <!-- Load the published plugin package here, e.g.
+<script src="https://unpkg.com/plugin-jatos-waiting-room"></script>
+<script src="../dist/index.global.js"></script> -->
+<!-- COMMENT OUT THIS LINE FOR JATOS DISTRIBUTION
+  <script src="../dist/index.browser.js"></script>-->
+  <!-- UNCOMMENT THESE NEXT TWO LINES FOR JATOS DISTRIBUTION -->
+  <script src="jspsych/jspsych.js"></script>
+  <script src="jspsych/plugin-jatos-waiting-room.js"></script>
+  <script src="jatos.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/jspsych/css/jspsych.css">
+</head>
+
+<body></body>
+<script>
+  /** example assumes that you already have jatos installed and is running this with a jatos thing.*/
+  var jsPsych = initJsPsych({
+    on_trial_start: jatos.addAbortButton,
+    on_finish: () => jatos.endStudy(jsPsych.data.get().json())
+  });
+
+  const trial = {
+    type: jsPsychPluginJatosWaitingRoom
+  };
+
+  jatos.onLoad(() => {
+    jsPsych.run([trial]);
+  });
+</script>
+
+</html>
