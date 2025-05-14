@@ -109,6 +109,16 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
     this.params = trial;
     // --- HTML Structure ---
+
+        /* jatos-chat-content: Defines ID attribute to reference content included in the chat
+         * jatos-chat-history: Defines container for chat log history
+         * jatos-sendMsgForm: Creates form element
+         * jatos-msgText: Defines input element to allow users to type messages
+         * jatos-sendMsgButton: Defines button element for the 'Send' button
+         * jatos-endStudyButton Defines button element for the 'End Study' button
+         * jatos-quitStudyButton Defines button element for the 'Quit Study' button
+         */
+
     let html = `
       <div id="jatos-chat-content">
           <div class="pure-g">
@@ -136,9 +146,16 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     const endStudyButton: HTMLButtonElement = display_element.querySelector("#jatos-endStudyButton");
     const quitStudyButton: HTMLButtonElement = display_element.querySelector("#jatos-quitStudyButton");
 
+
+     /** 
+     * Defines trial chat log global array to store data from chat log *
+     */
     this.trial_data.chat_log = [];
 
     const appendToHistory = (text, color, isEvent = false) => {
+       /** 
+       * Defines constant that will iteratively append corresponding timestamps, messages, and member IDs to the chat log trial array *
+       */
       const listItem = document.createElement("li");
       listItem.textContent = text;
       listItem.style.color = color;
@@ -161,10 +178,18 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       }
     };
 
+
+     /** 
+     * Defines current data and time *
+     */
     const getTime = () => {
       return new Date(new Date().getTime()).toUTCString();
     };
 
+
+     /** 
+     * Defines random color that will later be used for each unique member ID *
+     */
     const stringToColour = (str) => {
       if (!str) return defaultColor;
       let hash = 0;
@@ -180,6 +205,10 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     };
 
     const onOpen = () => {
+       /** 
+       * Generates message that lets user know they have been connected to Jatos *
+       * Appends message to chat log history *
+       */
       const message = "You are connected.";
       appendToHistory(message, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_connected", timestamp: new Date().toISOString(), message: message });
@@ -187,6 +216,11 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     };
 
     const onClose = () => {
+       /** 
+       * Generates message that lets user know they have been disconnected from Jatos *
+       * Appends message to chat log history *
+       * *Disables send button and ability to send any more messages * 
+       */
       const message = "You are disconnected.";
       appendToHistory(message, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_disconnected", timestamp: new Date().toISOString(), message: message });
@@ -195,12 +229,23 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     };
 
     const onError = (error) => {
+       /** 
+       * Generates message that an error has occurred *
+       * Appends error message to chat log history *
+       */ 
       const message = "An error occurred: " + error;
       appendToHistory(message, errorColor, true);
       //this.trial_data.events.push({ type: "jatos_error", timestamp: new Date().toISOString(), error: String(error) });
     };
 
     const onMessage = (chatBundle) => {
+       /** 
+       * Creates constant to define member ID in the chat *
+       * Creates constant to define a received message *
+       * Creates constant for each received message that defines the time and corresponding member ID of each message  *
+       * Assigns random color to each member ID *
+       * Appends message and member ID to chat log history *
+       */ 
       const memberId = chatBundle && chatBundle.groupMemberId ? chatBundle.groupMemberId : "UnknownMember";
       const receivedMsg = chatBundle && chatBundle.msg ? chatBundle.msg : "[empty message]";
       const msg = `${getTime()} - ${memberId}: ${receivedMsg}`;
@@ -209,12 +254,20 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     };
 
     const onMemberOpen = (memberId) => {
+       /** 
+       * Generates message indicating that a new member has joined the group chat along with their member ID *
+       * Appends ID of new member and timestamp to chat log history *
+       */ 
       const message = `A new member joined: ${memberId}`;
       appendToHistory(message, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_member_joined", timestamp: new Date().toISOString(), memberId: memberId });
     };
 
     const onMemberClose = (memberId) => {
+       /** 
+       * Generates message indicating that a specific member has left the group chat *
+       * Appends ID of member who left and timestamp to chat log history *
+       */ 
       const message = `${memberId} left`;
       appendToHistory(message, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_member_left", timestamp: new Date().toISOString(), memberId: memberId });
@@ -243,6 +296,9 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
     // --- Event Listeners ---
     msgTextInput.addEventListener('keypress', (event) => {
+       /** 
+       * Enables keyboard press of 'Enter' to send message in the chat by authorizing the click of the 'Send' button *
+       */ 
       if (event.key === 'Enter' || event.which === 13) {
         event.preventDefault();
         sendMsgButton.click();
@@ -250,11 +306,14 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     });
 
     sendMsgButton.addEventListener('click', () => {
+      /* Trim whitespaces and return the message. If the message is null or empty, exit the function */
       const msg = msgTextInput.value.trim();
       if (!msg) {
         return;
       }
 
+      /* If groupMemberID variable exists, define memberID as groupMemberID, else, define memberID constant as 'LocalUser' */
+      /* Organize chatBundle constant to reflect the message and the corresponding member ID */
       msgTextInput.value = "";
       const memberId = (this.jatos && this.jatos.groupMemberId) ? this.jatos.groupMemberId : "LocalUser";
       const chatBundle = {
@@ -262,8 +321,10 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
         groupMemberId: memberId,
       };
 
+      /* Declare messageSentViaJatos as 'false'*/
       let messageSentViaJatos = false;
         
+        /* Sends the message and records any errors that may arise */
         // if (this.jatos.group && typeof this.jatos.group.isChannelOpen === 'function' && this.jatos.group.isChannelOpen()) {
           try {
             this.jatos.sendGroupMsg(chatBundle);
@@ -282,7 +343,9 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     });
 
     endStudyButton.addEventListener('click', () => {
-      // this is a little complicated...
+       /** 
+       * When 'End Study' button is clicked, organize the study data and store in a 'data' object and end the trial *
+       */ 
       const trial_data = {
         chat_log: this.trial_data.chat_log,
         chat_timestamps: this.trial_data.chat_timestamps, 
@@ -296,6 +359,9 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     });
 
     quitStudyButton.addEventListener('click', () => {
+       /** 
+       * When 'Quit Study' button is clicked, collect member ID, and replace trial data with "ppt_withdrew"*
+       */ 
       var answer = confirm(this.params.quit_alert_text)
       if (answer){
         // get the member id of the participant who is quitting
