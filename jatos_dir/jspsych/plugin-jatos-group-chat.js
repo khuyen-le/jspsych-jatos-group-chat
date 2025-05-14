@@ -268,9 +268,9 @@ var jsPsychJatosGroupChatPlugin = (function (jspsych) {
           this.jsPsych.finishTrial(data);
   
           // Call the on_finish callback if provided
-          if (trial.on_finish) {
-            trial.on_finish(data);
-          }
+          //if (trial.on_finish) {
+            //trial.on_finish(data);
+          //}
         });
       }
     }
