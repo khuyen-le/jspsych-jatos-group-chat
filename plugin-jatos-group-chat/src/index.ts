@@ -7,11 +7,11 @@ const info = <const>{
   version: version,
   parameters: {
     /** All the text */
-    end_text: {
+    button_label_end_study: {
       type: ParameterType.STRING, // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
       default: "End Study",
     },
-    quit_text: {
+    button_label_quit_study: {
       type: ParameterType.STRING,
       default: "Quit Study"
     },
@@ -19,13 +19,13 @@ const info = <const>{
       type: ParameterType.STRING,
       default: "Are you sure you want to quit the study?"
     },
-    send_text: {
+    button_label_send: {
       type: ParameterType.STRING, 
       default: "Send",
     },
     message_placeholder: {
       type: ParameterType.STRING, 
-      default: "Your message ...",
+      default: "Type your message and press enter.",
     },
     connected_text: { 
       type: ParameterType.STRING, 
@@ -38,26 +38,29 @@ const info = <const>{
     /** possible extensions: max number of people, etc. */
   },
   data: {
-    chat_history_raw: {
-      type: ParameterType.STRING,
-      description: "An array of strings, where each string is a raw message from the chat history display."
-    },
     chat_log_structured: {
-      type: ParameterType.OBJECT,
-      description: "An array of objects, each representing a chat message with timestamp, message content, and color."
-    },
-    jatos_events: {
-      type: ParameterType.OBJECT,
-      description: "An array of objects, logging JATOS-specific events like connections, disconnections, errors, and member joins/leaves."
+      type: ParameterType.COMPLEX, 
+      array: true
+    }, 
+    chat_timestamps: {
+      type: ParameterType.COMPLEX, 
+      array: true
+    }, 
+    chat_senders: {
+      type: ParameterType.COMPLEX, 
+      array: true
+    }, 
+    chat_messages: {
+      type: ParameterType.COMPLEX, 
+      array: true
     },
     participant_id: {
       type: ParameterType.STRING,
-      description: "JATOS worker ID, if available."
     },
     group_member_id: {
       type: ParameterType.STRING,
-      description: "JATOS group member ID, if available."
-    },
+    }, 
+    /** message that was sent */
     group_id: {
       type: ParameterType.STRING,
       description: "JATOS group result ID, if available."
@@ -99,27 +102,65 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
   private params: TrialType<Info>;
   /** these private arrays should be updated as new messages come in */
-  private timestamps: string[]; 
-  private senders: string[];
-  private messages: string[];
+  private chat_timestamps: string[]; 
+  private chat_senders: string[];
+  private chat_messages: string[];
+  private chat_log_structured: object[];
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
     // --- HTML Structure ---
     let html = `
-        <div id="jatos-chat-content">
-            <div class="pure-g">
-                <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
-                    <ul></ul>
-                </div>
-            </div>
-            <form id="jatos-sendMsgForm" class="pure-form">
-                <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${trial.prompt}">
-                <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${trial.button_label_send}</button>
-            </form>
-            <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${trial.button_label_end_study}</button>
-        </div>
-      `;
+      <div id="jatos-chat-content">
+          <div class="pure-g">
+              <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+                  <ul></ul>
+              </div>
+          </div>
+          <form id="jatos-sendMsgForm" class="pure-form">
+              <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${this.params.message_placeholder}">
+              <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${this.params.button_label_send}</button>
+          </form>
+          <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${this.params.button_label_end_study}</button>
+          <button id="jatos-quitStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${this.params.button_label_quit_study}</button>
+      </div>
+    `;
     display_element.innerHTML = html;
+
+    const quitStudyButton = display_element.querySelector("#jatos-quitStudyButton");
+
+    quitStudyButton.addEventListener('click', () => {
+      this.quit_study()
+    }
+  }
+
+  /** this function should be called when participant clicks the Quit Study button */
+  private quit_study() {
+    var answer = confirm(this.params.quit_alert_text)
+    if (answer){
+      // get the member id of the participant who is quitting
+      // @ts-expect-error
+      let ppt_member_id = this.jatos.groupMemberId;
+      // boolean array, store True for match, False for no match
+      // this implementation allows the function to run in O(n)
+      let ppt_idx_bool = [];
+      this.chat_senders.forEach((sender_id, index) => {
+        if (sender_id == ppt_member_id) {
+          ppt_idx_bool.push(true);
+        } else {
+          ppt_idx_bool.push(false);
+        }
+      });
+
+      for (let i = 0; i < ppt_idx_bool.length; i++) {
+        if (ppt_idx_bool[i]) {
+          this.chat_timestamps[i] = "ppt withdrew"
+          this.chat_messages[i] = "ppt withdrew"
+        }  
+      }
+      //TODO: check if this works. specifically, if the rest of the data exists.
+      this.jsPsych.finishTrial()
+    }
+  }
 
     // --- Chat Logic ---
     const defaultColor = "#aaa";
@@ -282,11 +323,6 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
       // End the jsPsych trial with the collected data
       this.jsPsych.finishTrial(data);
-
-      // Call the on_finish callback if provided
-      if (trial.on_finish) {
-        trial.on_finish(data);
-      }
     });
   }
 }
