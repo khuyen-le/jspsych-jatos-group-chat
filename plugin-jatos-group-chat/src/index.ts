@@ -72,9 +72,9 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
   private params: TrialType<Info>;
   /** these private arrays should be updated as new messages come in */
-  private timestamps: []; 
-  private senders: [];
-  private messages: [];
+  private timestamps: string[]; 
+  private senders: string[];
+  private messages: string[];
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
 
@@ -155,6 +155,27 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   private quit_study() {
     var answer = confirm(this.params.quit_alert_text)
     if (answer){
+      // get the member id of the participant who is quitting
+      // @ts-expect-error
+      let ppt_member_id = this.jatos.groupMemberId;
+      // boolean array, store True for match, False for no match
+      // this implementation allows the function to run in O(n)
+      let ppt_idx_bool = [];
+      this.senders.forEach((sender_id, index) => {
+        if (sender_id == ppt_member_id) {
+          ppt_idx_bool.push(true);
+        } else {
+          ppt_idx_bool.push(false);
+        }
+      });
+
+      for (let i = 0; i < ppt_idx_bool.length; i++) {
+        if (ppt_idx_bool[i]) {
+          this.timestamps[i] = "ppt withdrew"
+          this.messages[i] = "ppt withdrew"
+        }  
+      }
+      //TODO: check if this works. specifically, if the rest of the data exists.
       this.jsPsych.finishTrial()
     }
   }
