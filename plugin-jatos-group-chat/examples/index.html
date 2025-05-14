@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>jsPsychPluginGroupChat Example</title>
+  <title>jsPsychPluginJatosGroupChat Example</title>
   <!-- <script src="https://unpkg.com/jspsych"></script> -->
   <!-- Load the published plugin package here, e.g.
 <script src="https://unpkg.com/plugin-jatos-waiting-room"></script>
@@ -20,25 +20,7 @@
   <!-- <link rel="stylesheet" href="https://unpkg.com/jspsych/css/jspsych.css"> -->
 </head>
 
-
 <script>
-    /// COMMENTING OUT FOR NOW ///
-    // /** example assumes that you already have jatos installed and is running this with a jatos thing.*/
-    // var jsPsych = initJsPsych({
-    //   on_trial_start: jatos.addAbortButton,
-    //   on_finish: () => jatos.endStudy(jsPsych.data.get().json())
-    // });
-
-    // const trial = {
-    //   type: jsPsychPluginJatosWaitingRoom
-    // };
-
-    // jatos.onLoad(() => {
-    //   jsPsych.run([trial]);
-    // });
-
-    ////
-
 
     const jsPsych = initJsPsych({
         on_trial_start: jatos.addAbortButton,
@@ -48,11 +30,16 @@
         }
     });
 
+    function generateMemberId(jatosMemberId) {
+      return `Member_${jatosMemberId}`
+    };
+
     const chatTrial = {
-        type: jsPsychJatosGroupChatPlugin,
+        type: jsPsychPluginJatosGroupChat,
         prompt: "Type your message and press Enter...",
         button_label_send: "Send Message",
         button_label_end_study: "Finish Chat",
+        username_generator_function: generateMemberId,
         on_finish: function (data) {
             console.log("Chat trial finished. Data:", data);
         }
@@ -64,8 +51,6 @@
 
 
 </script>
-
-<body></body>
 
 <body></body>
 
