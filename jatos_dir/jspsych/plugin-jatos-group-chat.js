@@ -210,7 +210,6 @@ var jsPsychJatosGroupChatPlugin = (function (jspsych) {
             });
           });
         
-  
         // --- Event Listeners ---
         msgTextInput.addEventListener('keypress', (event) => {
           if (event.key === 'Enter' || event.which === 13) {
