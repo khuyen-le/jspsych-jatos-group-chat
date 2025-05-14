@@ -38,7 +38,7 @@ const info = <const>{
     /** possible extensions: max number of people, etc. */
   },
   data: {
-    chat_log_structured: {
+    chat_log: {
       type: ParameterType.COMPLEX, 
       array: true
     }, 
@@ -74,7 +74,9 @@ type Info = typeof info;
 
 interface ChatData {
   chat_log: object[],
-  events: object[],
+  chat_timestamps: string[],
+  chat_senders: string[], 
+  chat_messages: string[]
 }
 
 /**
@@ -94,20 +96,18 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     this.jsPsych = jsPsych;
     this.trial_data = {
       chat_log: [],
-      events: [],
+      chat_timestamps: [], 
+      chat_senders: [], 
+      chat_messages: []
     }; // To store chat history and other relevant data
     // @ts-expect-error
     this.jatos = window.jatos; // Assuming JATOS is loaded globally
   }
 
   private params: TrialType<Info>;
-  /** these private arrays should be updated as new messages come in */
-  private chat_timestamps: string[]; 
-  private chat_senders: string[];
-  private chat_messages: string[];
-  private chat_log_structured: object[];
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
+    this.params = trial;
     // --- HTML Structure ---
     let html = `
       <div id="jatos-chat-content">
@@ -125,43 +125,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       </div>
     `;
     display_element.innerHTML = html;
-
-    const quitStudyButton = display_element.querySelector("#jatos-quitStudyButton");
-
-    quitStudyButton.addEventListener('click', () => {
-      this.quit_study()
-    }
-  }
-
-  /** this function should be called when participant clicks the Quit Study button */
-  private quit_study() {
-    var answer = confirm(this.params.quit_alert_text)
-    if (answer){
-      // get the member id of the participant who is quitting
-      // @ts-expect-error
-      let ppt_member_id = this.jatos.groupMemberId;
-      // boolean array, store True for match, False for no match
-      // this implementation allows the function to run in O(n)
-      let ppt_idx_bool = [];
-      this.chat_senders.forEach((sender_id, index) => {
-        if (sender_id == ppt_member_id) {
-          ppt_idx_bool.push(true);
-        } else {
-          ppt_idx_bool.push(false);
-        }
-      });
-
-      for (let i = 0; i < ppt_idx_bool.length; i++) {
-        if (ppt_idx_bool[i]) {
-          this.chat_timestamps[i] = "ppt withdrew"
-          this.chat_messages[i] = "ppt withdrew"
-        }  
-      }
-      //TODO: check if this works. specifically, if the rest of the data exists.
-      this.jsPsych.finishTrial()
-    }
-  }
-
+    
     // --- Chat Logic ---
     const defaultColor = "#aaa";
     const errorColor = "#f00";
@@ -170,9 +134,9 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     const msgTextInput: HTMLButtonElement = display_element.querySelector("#jatos-msgText");
     const sendMsgButton: HTMLButtonElement = display_element.querySelector("#jatos-sendMsgButton");
     const endStudyButton: HTMLButtonElement = display_element.querySelector("#jatos-endStudyButton");
+    const quitStudyButton: HTMLButtonElement = display_element.querySelector("#jatos-quitStudyButton");
 
     this.trial_data.chat_log = [];
-    this.trial_data.events = [];
 
     const appendToHistory = (text, color, isEvent = false) => {
       const listItem = document.createElement("li");
@@ -183,6 +147,14 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       if (!isEvent) {
         this.trial_data.chat_log.push({
           timestamp: new Date().toISOString(),
+          sender: this.jatos.groupMemberId,
+          message: text,
+          color: color
+        });
+      } else {
+        this.trial_data.chat_log.push({
+          timestamp: new Date().toISOString(),
+          sender: "system " + this.jatos.groupResultId,
           message: text,
           color: color
         });
@@ -210,14 +182,14 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     const onOpen = () => {
       const message = "You are connected.";
       appendToHistory(message, defaultColor, true);
-      this.trial_data.events.push({ type: "jatos_connected", timestamp: new Date().toISOString(), message: message });
+      //this.trial_data.events.push({ type: "jatos_connected", timestamp: new Date().toISOString(), message: message });
       msgTextInput.focus();
     };
 
     const onClose = () => {
       const message = "You are disconnected.";
       appendToHistory(message, defaultColor, true);
-      this.trial_data.events.push({ type: "jatos_disconnected", timestamp: new Date().toISOString(), message: message });
+      //this.trial_data.events.push({ type: "jatos_disconnected", timestamp: new Date().toISOString(), message: message });
       msgTextInput.disabled = true;
       sendMsgButton.disabled = true;
     };
@@ -225,7 +197,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     const onError = (error) => {
       const message = "An error occurred: " + error;
       appendToHistory(message, errorColor, true);
-      this.trial_data.events.push({ type: "jatos_error", timestamp: new Date().toISOString(), error: String(error) });
+      //this.trial_data.events.push({ type: "jatos_error", timestamp: new Date().toISOString(), error: String(error) });
     };
 
     const onMessage = (chatBundle) => {
@@ -239,34 +211,34 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     const onMemberOpen = (memberId) => {
       const message = `A new member joined: ${memberId}`;
       appendToHistory(message, defaultColor, true);
-      this.trial_data.events.push({ type: "jatos_member_joined", timestamp: new Date().toISOString(), memberId: memberId });
+      //this.trial_data.events.push({ type: "jatos_member_joined", timestamp: new Date().toISOString(), memberId: memberId });
     };
 
     const onMemberClose = (memberId) => {
       const message = `${memberId} left`;
       appendToHistory(message, defaultColor, true);
-      this.trial_data.events.push({ type: "jatos_member_left", timestamp: new Date().toISOString(), memberId: memberId });
+      //this.trial_data.events.push({ type: "jatos_member_left", timestamp: new Date().toISOString(), memberId: memberId });
     };
 
     // --- JATOS Integration ---
 
-      this.jatos.onLoad(() => { // jatos.onLoad ensures JATOS is ready.
-        this.jatos.joinGroup({
-          onOpen: onOpen,
-          onClose: onClose,
-          onError: onError,
-          onMessage: onMessage,
-          onMemberOpen: onMemberOpen,
-          onMemberClose: onMemberClose,
-        });
-
-        // JATOS global error handler (distinct from channel errors)
-        this.jatos.onError((error) => {
-          const message = "jatos.onError (global): " + error;
-          appendToHistory(message, errorColor, true);
-          this.trial_data.events.push({ type: "jatos_global_error", timestamp: new Date().toISOString(), error: String(error) });
-        });
+    this.jatos.onLoad(() => { // jatos.onLoad ensures JATOS is ready.
+      this.jatos.joinGroup({
+        onOpen: onOpen,
+        onClose: onClose,
+        onError: onError,
+        onMessage: onMessage,
+        onMemberOpen: onMemberOpen,
+        onMemberClose: onMemberClose,
       });
+
+      // JATOS global error handler (distinct from channel errors)
+      this.jatos.onError((error) => {
+        const message = "jatos.onError (global): " + error;
+        appendToHistory(message, errorColor, true);
+        //this.trial_data.events.push({ type: "jatos_global_error", timestamp: new Date().toISOString(), error: String(error) });
+      });
+    });
     
 
     // --- Event Listeners ---
@@ -310,21 +282,49 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     });
 
     endStudyButton.addEventListener('click', () => {
-      const data = {
-        chat_log_structured: this.trial_data.chat_log,
-        jatos_events: this.trial_data.events,
+      // this is a little complicated...
+      const trial_data = {
+        chat_log: this.trial_data.chat_log,
+        chat_timestamps: this.trial_data.chat_timestamps, 
+        chat_senders: this.trial_data.chat_senders,
+        chat_messages: this.trial_data.chat_messages,
         participant_id: (this.jatos && this.jatos.workerId) ? this.jatos.workerId : null,
         group_member_id: (this.jatos && this.jatos.groupMemberId) ? this.jatos.groupMemberId : null,
         group_id: (this.jatos && this.jatos.groupResultId) ? this.jatos.groupResultId : null,
       };
-
-      // Clean up the display
-      display_element.innerHTML = '';
-
-      // End the jsPsych trial with the collected data
-      this.jsPsych.finishTrial(data);
+      this.jsPsych.finishTrial(trial_data);
     });
+
+    quitStudyButton.addEventListener('click', () => {
+      var answer = confirm(this.params.quit_alert_text)
+      if (answer){
+        // get the member id of the participant who is quitting
+        let ppt_member_id = this.jatos.groupMemberId;
+        // boolean array, store True for match, False for no match
+        // this implementation allows the function to run in O(n)
+        let ppt_idx_bool = [];
+        this.trial_data.chat_senders.forEach((sender_id, index) => {
+          if (sender_id == ppt_member_id) {
+            ppt_idx_bool.push(true);
+          } else {
+            ppt_idx_bool.push(false);
+          }
+        });
+  
+        for (let i = 0; i < ppt_idx_bool.length; i++) {
+          if (ppt_idx_bool[i]) {
+            this.trial_data.chat_timestamps[i] = "ppt withdrew"
+            this.trial_data.chat_messages[i] = "ppt withdrew"
+          }  
+        }
+        //TODO: check if this works. specifically, if the rest of the data exists.
+        this.jsPsych.finishTrial()
+      }
+    })
+
   }
+
+
 }
 
 export default JatosGroupChatPlugin;
