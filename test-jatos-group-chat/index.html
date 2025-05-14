@@ -2,80 +2,35 @@
 <html>
 
 <head>
-  <title>jsPsychPluginJatosWaitingRoom Example</title>
-  <!-- <script src="https://unpkg.com/jspsych"></script> -->
+  <title>jsPsychPluginJatosGroupChat Example</title>
+  <script src="https://unpkg.com/jspsych"></script>
   <!-- Load the published plugin package here, e.g.
-<script src="https://unpkg.com/plugin-jatos-waiting-room"></script>
+<script src="https://unpkg.com/plugin-jatos-group-chat"></script>
 <script src="../dist/index.global.js"></script> -->
 <!-- COMMENT OUT THIS LINE FOR JATOS DISTRIBUTION
   <script src="../dist/index.browser.js"></script>-->
   <!-- UNCOMMENT THESE NEXT TWO LINES FOR JATOS DISTRIBUTION -->
-  <script src="../plugin-jatos-group-chat/plugin-jatos-group-chat.js"></script> 
-  <link href="jspsych/jspsych.css" rel="stylesheet" type="text/css" />
   <script src="jspsych/jspsych.js"></script>
-  <script src="jspsych/plugin-jatos-waiting-room.js"></script>
+  <script src="jspsych/plugin-jatos-group-chat.js"></script>
   <script src="jatos.js"></script>
-  <!-- <link rel="stylesheet" href="https://unpkg.com/jspsych/css/jspsych.css"> -->
+  <link rel="stylesheet" href="https://unpkg.com/jspsych/css/jspsych.css">
 </head>
 
 <body></body>
 <script>
-  /// COMMENTING OUT FOR NOW ///
-  // /** example assumes that you already have jatos installed and is running this with a jatos thing.*/
-  // var jsPsych = initJsPsych({
-  //   on_trial_start: jatos.addAbortButton,
-  //   on_finish: () => jatos.endStudy(jsPsych.data.get().json())
-  // });
+  /** example assumes that you already have jatos installed and is running this with a jatos thing.*/
+  var jsPsych = initJsPsych({
+    on_trial_start: jatos.addAbortButton,
+    on_finish: () => jatos.endStudy(jsPsych.data.get().json())
+  });
 
-  // const trial = {
-  //   type: jsPsychPluginJatosWaitingRoom
-  // };
+  const trial = {
+    type: jsPsychPluginJatosGroupChat
+  };
 
-  // jatos.onLoad(() => {
-  //   jsPsych.run([trial]);
-  // });
-
-  ////
-
-
-  const jsPsych = initJsPsych({
-    on_finish: function() {
-        // Option 1: Get all jsPsych data
-        const all_data = jsPsych.data.get().values();
-        console.log(all_data);
-        // If running in JATOS, submit all data at the end
-        if (jatos.isJatosRun()) {
-            jatos.submitResultData(all_data, jatos.startNextComponent);
-        } else {
-            jsPsych.data.displayData();
-        }
-    }
-});
-
-const chatTrial = {
-    type: JatosGroupChatPlugin, // Use the class name
-    prompt: "Type your message and press Enter...",
-    button_label_send: "Send Message",
-    button_label_end_study: "Finish Chat",
-    on_finish: function(data) {
-        console.log("Chat trial finished. Data:", data);
-        // You can do something specific with the chat data here if needed
-        // This data will also be part of the global jsPsych.data.get()
-    }
-};
-
-const timeline = [chatTrial];
-
-// Ensure JATOS is ready before starting the experiment
-if (jatos.isJatosRun()) {
-    jatos.onLoad(() => {
-        jsPsych.run(timeline);
-    });
-} else {
-    // For local testing without JATOS
-    jsPsych.run(timeline);
-}
-
+  jatos.onLoad(() => {
+    jsPsych.run([trial]);
+  });
 </script>
 
 </html>
