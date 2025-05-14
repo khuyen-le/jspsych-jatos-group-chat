@@ -6,34 +6,50 @@ const info = <const>{
   name: "plugin-jatos-group-chat",
   version: version,
   parameters: {
-    /** Provide a clear description of the parameter_name that could be used as documentation. We will eventually use these comments to automatically build documentation and produce metadata. */
-    min_n_people: {
-      type: ParameterType.INT, 
-      default: 2,
-    },
-    join_text: {
+    /** All the text */
+    end_text: {
       type: ParameterType.STRING, // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
-      default: "JOIN",
+      default: "End Study",
     },
-    leave_text: {
-      type: ParameterType.STRING, // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
-      default: "LEAVE",
+    quit_text: {
+      type: ParameterType.STRING,
+      default: "Quit Study"
     },
-    wait_text: {
-      type: ParameterType.STRING, // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
-      default: "Waiting...",
+    quit_alert_text: {
+      type: ParameterType.STRING,
+      default: "Are you sure you want to quit the study?"
     },
-    n_people_waiting: {
-      type: ParameterType.INT, // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
-      default: 0
+    send_text: {
+      type: ParameterType.STRING, 
+      default: "Send",
     },
+    message_placeholder: {
+      type: ParameterType.STRING, 
+      default: "Your message ...",
+    },
+    connected_text: { 
+      type: ParameterType.STRING, 
+      default: "You are connected.",
+    },
+    new_member_text: { 
+      type: ParameterType.STRING,
+      default: "A new member joined:",
+    }
+    /** possible extensions: max number of people, etc. */
   },
   data: {
-    /** actually doesn't need any data back, I think... */
-    /** Provide a clear description of the data1 that could be used as documentation. We will eventually use these comments to automatically build documentation and produce metadata. */
-    data1: {
-      type: ParameterType.INT,
+    /** date and time, needs to be converted to string */
+    timestamp: {
+      type: ParameterType.STRING,
     },
+    /** name of sender, needs to be converted to string. If a system message, then this should be `system_` + session_id */
+    sender: {
+      type: ParameterType.STRING,
+    }, 
+    /** message that was sent */
+    message: {
+      type: ParameterType.STRING,
+    }
   },
   // When you run build on your plugin, citations will be generated here based on the information in the CITATION.cff file.
   citations: '__CITATIONS__',
@@ -53,6 +69,12 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   static info = info;
 
   constructor(private jsPsych: JsPsych) {}
+
+  private params: TrialType<Info>;
+  /** these private arrays should be updated as new messages come in */
+  private timestamps: []; 
+  private senders: [];
+  private messages: [];
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
 
@@ -127,6 +149,25 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       // end trial
       this.jsPsych.finishTrial(trial_data);
     }
+  }
+
+  /** this function should be called when participant clicks the Quit Study button */
+  private quit_study() {
+    var answer = confirm(this.params.quit_alert_text)
+    if (answer){
+      this.jsPsych.finishTrial()
+    }
+  }
+
+  /** this function should be called when participant clicks the End Study button*/
+  private end_study(response = null) {
+
+    const trial_data = <any>{};
+    trial_data.timestamp = this.timestamps
+    trial_data.senders = this.senders
+    trial_data.messages = this.messages
+
+    this.jsPsych.finishTrial(trial_data);
   }
 }
 
