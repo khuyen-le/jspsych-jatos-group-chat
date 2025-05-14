@@ -98,10 +98,10 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   }
 
   private params: TrialType<Info>;
-  /** these private arrays should be updated as new messages come in */
-  private timestamps: string[]; 
-  private senders: string[];
-  private messages: string[];
+  // /** these private arrays should be updated as new messages come in */
+  // private timestamps: []; 
+  // private senders: [];
+  // private messages: [];
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
 
