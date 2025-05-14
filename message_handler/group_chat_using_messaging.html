@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
+    <link rel="stylesheet" type="text/css" href="css/group_chat.css" />
+    <script src="libs/jquery-1.11.1.min.js"></script>
+    <script src="jatos.js"></script>
+</head>
+
+<body>
+    <div id="content">
+
+        <div class="pure-g">
+            <div id="history" class="pure-u-2-3">
+                <ul></ul>
+            </div>
+        </div>
+        <form id="sendMsgForm" class="pure-form">
+            <input id="msgText" type="text" class="pure-input-2-3" placeholder="Your message ...">
+            <button id="sendMsgButton" class="pure-button pure-button-primary" type='button'>Send</button>
+        </form>
+
+        <button id="endStudyButton" class="pure-button pure-button-primary">End Study</button>
+
+    </div>
+
+    <script type="text/javascript">
+        var defaultColor = "#aaa";
+        var errorColor = "#f00";
+
+        jatos.onLoad(function() {
+            jatos.joinGroup({
+                "onOpen": onOpen,
+                "onClose": onClose,
+                "onError": onError,
+                "onMessage": onMessage,
+                "onMemberOpen": onMemberOpen,
+                "onMemberClose": onMemberClose
+            });
+            jatos.addAbortButton();
+        });
+
+        jatos.onError(function(error) {
+            appendToHistory("jatos.onError('" + error + "')", errorColor);
+        });
+
+        function onOpen() {
+            appendToHistory("You are connected.", defaultColor);
+            $('#msgText').focus();
+        }
+
+        function onClose() {
+            appendToHistory("You are disconnected.", defaultColor);
+        }
+
+        function onError(error) {
+            appendToHistory("An error occured: " + error, errorColor);
+        }
+
+        function onMessage(chatBundle) {
+            var msg = getTime() + " - " + chatBundle.groupMemberId + ": " + chatBundle.msg;
+            var color = stringToColour(chatBundle.groupMemberId);
+            appendToHistory(msg, color);
+        }
+
+        function onMemberOpen(memberId) {
+            appendToHistory("A new member joined: " + memberId, defaultColor);
+        }
+
+        function onMemberClose(memberId) {
+            appendToHistory(memberId + " left", defaultColor);
+        }
+
+        function appendToHistory(text, color) {
+            $("#history ul").append('<li>' + text + '</li>');
+            $("#history li").last().css('color', color);
+            // Scroll to bottom
+            $("#history").scrollTop($("#history")[0].scrollHeight);
+        }
+
+        $('#msgText').keypress(function(event) {
+            // Check for 'Enter' button press
+            if (event.which == 13) {
+                event.preventDefault();
+                // Treat it as if the send button was clicked.
+                $("#sendMsgButton").click();
+            }
+        });
+
+        $('#sendMsgButton').click(function() {
+            var msg = $('#msgText').val();
+            if (!msg.trim()) {
+                return;
+            }
+
+            // Create object to be send to all other participants with message text an group member ID
+            $('#msgText').val("");
+            var chatBundle = {
+                "msg": msg,
+                "groupMemberId": jatos.groupMemberId
+            };
+            jatos.sendGroupMsg(chatBundle);
+
+            // Write it into own history
+            appendToHistory(getTime() + " - You: " + msg, stringToColour(jatos.groupMemberId));
+        });
+
+        function getTime() {
+            return new Date(new Date().getTime()).toUTCString();
+        }
+
+        // A function that uses a string as a seed to generate a pseudo-random color
+        function stringToColour(str) {
+            var color = Math.floor((Math.abs(Math.sin(parseInt(str)) * 16777215)) % 16777215).toString(16);
+            return "#" + color;
+        }
+
+        $('#endStudyButton').click(function() {
+            // Get all chat messages from history and put them into an array
+            var historyData = [];
+            $('#history li').each(function(i) {
+                historyData.push($(this).text());
+            });
+            // Send history as result data to JATOS and finish the study 
+            var resultJson = JSON.stringify(historyData);
+            jatos.startNextComponent(resultJson);
+        });
+    </script>
+</body>
