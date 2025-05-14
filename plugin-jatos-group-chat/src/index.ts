@@ -7,11 +7,11 @@ const info = <const>{
   version: version,
   parameters: {
     /** All the text */
-    end_text: {
+    button_label_end_study: {
       type: ParameterType.STRING, // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
       default: "End Study",
     },
-    quit_text: {
+    button_label_quit_study: {
       type: ParameterType.STRING,
       default: "Quit Study"
     },
@@ -19,13 +19,13 @@ const info = <const>{
       type: ParameterType.STRING,
       default: "Are you sure you want to quit the study?"
     },
-    send_text: {
+    button_label_send: {
       type: ParameterType.STRING, 
       default: "Send",
     },
     message_placeholder: {
       type: ParameterType.STRING, 
-      default: "Your message ...",
+      default: "Type your message and press enter.",
     },
     connected_text: { 
       type: ParameterType.STRING, 
@@ -38,16 +38,32 @@ const info = <const>{
     /** possible extensions: max number of people, etc. */
   },
   data: {
+    chat_log_structured: {
+      type: ParameterType.COMPLEX, 
+      array: true
+    }, 
+    chat_timestamps: {
+      type: ParameterType.COMPLEX, 
+      array: true
+    }, 
+    chat_senders: {
+      type: ParameterType.COMPLEX, 
+      array: true
+    }, 
+    chat_messages: {
+      type: ParameterType.COMPLEX, 
+      array: true
+    },
     /** date and time, needs to be converted to string */
-    timestamp: {
+    participant_id: {
       type: ParameterType.STRING,
     },
     /** name of sender, needs to be converted to string. If a system message, then this should be `system_` + session_id */
-    sender: {
+    group_member_id: {
       type: ParameterType.STRING,
     }, 
     /** message that was sent */
-    message: {
+    group_id: {
       type: ParameterType.STRING,
     }
   },
@@ -72,82 +88,34 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
   private params: TrialType<Info>;
   /** these private arrays should be updated as new messages come in */
-  private timestamps: string[]; 
-  private senders: string[];
-  private messages: string[];
+  private chat_timestamps: string[]; 
+  private chat_senders: string[];
+  private chat_messages: string[];
+  private chat_log_structured: object[];
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
-
-    const html = `<div>
-      <div id="jspsych-waiting-text">${trial.wait_text}</div>
-      <button id="jspsych-join-btn" class="jspsych-btn">${trial.join_text}</button>
-      <button id="jspsych-leave-btn" class="jspsych-btn">${trial.leave_text}</button>
-      <p><span id="jspsych-member-counter">0</span>&nbsp;Members</p>
+    // --- HTML Structure ---
+    let html = `
+      <div id="jatos-chat-content">
+          <div class="pure-g">
+              <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+                  <ul></ul>
+              </div>
+          </div>
+          <form id="jatos-sendMsgForm" class="pure-form">
+              <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${this.params.message_placeholder}">
+              <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${this.params.button_label_send}</button>
+          </form>
+          <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${this.params.button_label_end_study}</button>
+          <button id="jatos-quitStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${this.params.button_label_quit_study}</button>
       </div>
-    `
-    display_element.innerHTML = html
+    `;
+    display_element.innerHTML = html;
 
-    function showMemberStatus() {
-      // @ts-expect-error
-      if (jatos.groupChannels && jatos.groupChannels.length > 0) {
-      // @ts-expect-error
-        display_element.querySelector("#jspsych-member-counter").textContent = jatos.groupChannels.length;
-      } else {
-        display_element.querySelector("#jspsych-member-counter").textContent = "0"
-      }
-    }
+    const quitStudyButton = display_element.querySelector("#jatos-quitStudyButton");
 
-    showMemberStatus()
-
-    var join_button = display_element.querySelector("#jspsych-join-btn");
-    join_button.addEventListener("click", () => {
-      // @ts-expect-error
-      jatos.joinGroup({
-        "onOpen": onOpen,
-        "onMemberOpen": onMemberOpen,
-        "onMessage": onMessage
-      });
-    });
-
-    /** These three functions are mainly to troubleshoot, remove in the final version */
-    function onOpen() {
-      showMemberStatus()
-      console.log("You joined a group and opened a group channel");
-    }
-    
-    function onMemberOpen(memberId) {
-      showMemberStatus()
-      console.log("In our group another member (ID " + memberId + ") opened a group channel");
-    }
-    
-    function onMessage(msg) {
-      showMemberStatus()
-      console.log("You received a message: " + msg);
-    }
-    
-    // What todo when jatos.js produces an error
-    // @ts-expect-error
-    jatos.onError(function(errorMsg) {
-      console.log("Error: " + errorMsg);
-    });
-    
-    var leave_button = display_element.querySelector("#jspsych-leave-btn");
-    leave_button.addEventListener("click", () => {
-      // data saving
-      var trial_data = {
-        data1: 99, // Make sure this type and name matches the information for data1 in the data object contained within the info const.
-      };
-      // end trial
-      this.jsPsych.finishTrial(trial_data);
-    });
-
-    if(1 < 0){
-      // data saving
-      var trial_data = {
-        data1: 99, // Make sure this type and name matches the information for data1 in the data object contained within the info const.
-      };
-      // end trial
-      this.jsPsych.finishTrial(trial_data);
+    quitStudyButton.addEventListener('click', () => {
+      this.quit_study()
     }
   }
 
@@ -161,7 +129,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       // boolean array, store True for match, False for no match
       // this implementation allows the function to run in O(n)
       let ppt_idx_bool = [];
-      this.senders.forEach((sender_id, index) => {
+      this.chat_senders.forEach((sender_id, index) => {
         if (sender_id == ppt_member_id) {
           ppt_idx_bool.push(true);
         } else {
@@ -171,8 +139,8 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
       for (let i = 0; i < ppt_idx_bool.length; i++) {
         if (ppt_idx_bool[i]) {
-          this.timestamps[i] = "ppt withdrew"
-          this.messages[i] = "ppt withdrew"
+          this.chat_timestamps[i] = "ppt withdrew"
+          this.chat_messages[i] = "ppt withdrew"
         }  
       }
       //TODO: check if this works. specifically, if the rest of the data exists.
@@ -184,9 +152,10 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   private end_study(response = null) {
 
     const trial_data = <any>{};
-    trial_data.timestamp = this.timestamps
-    trial_data.senders = this.senders
-    trial_data.messages = this.messages
+    trial_data.chat_timestamps = this.timestamps
+    trial_data.chat_senders = this.senders
+    trial_data.chat_messages = this.messages
+    trial_data.chat_log_structured = this.chat_log_structured
 
     this.jsPsych.finishTrial(trial_data);
   }
