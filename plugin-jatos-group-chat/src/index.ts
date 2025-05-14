@@ -303,7 +303,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       var answer = confirm(this.params.quit_alert_text)
       if (answer){
         // get the member id of the participant who is quitting
-        let ppt_member_id = this.jatos.groupMemberId;
+        let ppt_member_id = String(this.jatos.groupMemberId);
         // boolean array, store True for match, False for no match
         // this implementation allows the function to run in O(n)
         let ppt_idx_bool = [];
@@ -319,6 +319,10 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
           if (ppt_idx_bool[i]) {
             this.trial_data.chat_timestamps[i] = "ppt withdrew"
             this.trial_data.chat_messages[i] = "ppt withdrew"
+            this.trial_data.chat_log[i]["timestamp"] = "ppt withdrew"
+            this.trial_data.chat_log[i]["message"] = "ppt withdrew"
+            this.trial_data.chat_log[i]["color"] = "ppt withdrew"
+            }
           }  
         }
         //TODO: check if this works. specifically, if the rest of the data exists.
