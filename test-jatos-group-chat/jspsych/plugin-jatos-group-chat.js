@@ -8,12 +8,12 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
     version,
     parameters: {
       /** All the text */
-      end_text: {
+      button_label_end_study: {
         type: jspsych.ParameterType.STRING,
         // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
         default: "End Study"
       },
-      quit_text: {
+      button_label_quit_study: {
         type: jspsych.ParameterType.STRING,
         default: "Quit Study"
       },
@@ -21,13 +21,13 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
         type: jspsych.ParameterType.STRING,
         default: "Are you sure you want to quit the study?"
       },
-      send_text: {
+      button_label_send: {
         type: jspsych.ParameterType.STRING,
         default: "Send"
       },
       message_placeholder: {
         type: jspsych.ParameterType.STRING,
-        default: "Your message ..."
+        default: "Type your message and press enter."
       },
       connected_text: {
         type: jspsych.ParameterType.STRING,
@@ -40,26 +40,29 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
       /** possible extensions: max number of people, etc. */
     },
     data: {
-      chat_history_raw: {
-        type: jspsych.ParameterType.STRING,
-        description: "An array of strings, where each string is a raw message from the chat history display."
+      chat_log: {
+        type: jspsych.ParameterType.COMPLEX,
+        array: true
       },
-      chat_log_structured: {
-        type: jspsych.ParameterType.OBJECT,
-        description: "An array of objects, each representing a chat message with timestamp, message content, and color."
+      chat_timestamps: {
+        type: jspsych.ParameterType.COMPLEX,
+        array: true
       },
-      jatos_events: {
-        type: jspsych.ParameterType.OBJECT,
-        description: "An array of objects, logging JATOS-specific events like connections, disconnections, errors, and member joins/leaves."
+      chat_senders: {
+        type: jspsych.ParameterType.COMPLEX,
+        array: true
+      },
+      chat_messages: {
+        type: jspsych.ParameterType.COMPLEX,
+        array: true
       },
       participant_id: {
-        type: jspsych.ParameterType.STRING,
-        description: "JATOS worker ID, if available."
+        type: jspsych.ParameterType.STRING
       },
       group_member_id: {
-        type: jspsych.ParameterType.STRING,
-        description: "JATOS group member ID, if available."
+        type: jspsych.ParameterType.STRING
       },
+      /** message that was sent */
       group_id: {
         type: jspsych.ParameterType.STRING,
         description: "JATOS group result ID, if available."
@@ -77,7 +80,9 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
       this.jsPsych = jsPsych;
       this.trial_data = {
         chat_log: [],
-        events: []
+        chat_timestamps: [],
+        chat_senders: [],
+        chat_messages: []
       };
       this.jatos = window.jatos;
     }
@@ -85,94 +90,91 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
       this.info = info;
     }
     trial(display_element, trial) {
+      this.params = trial;
       let html = `
-        <div id="jatos-chat-content">
-            <div class="pure-g">
-                <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
-                    <ul></ul>
-                </div>
-            </div>
-            <form id="jatos-sendMsgForm" class="pure-form">
-                <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${trial.prompt}">
-                <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${trial.button_label_send}</button>
-            </form>
-            <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${trial.button_label_end_study}</button>
-        </div>
-      `;
+      <div id="jatos-chat-content">
+          <div class="pure-g">
+              <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+                  <ul></ul>
+              </div>
+          </div>
+          <form id="jatos-sendMsgForm" class="pure-form">
+              <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${this.params.message_placeholder}">
+              <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${this.params.button_label_send}</button>
+          </form>
+          <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${this.params.button_label_end_study}</button>
+          <button id="jatos-quitStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${this.params.button_label_quit_study}</button>
+      </div>
+    `;
       display_element.innerHTML = html;
       const defaultColor = "#aaa";
-      const errorColor = "#f00";
       const historyElement = display_element.querySelector("#jatos-chat-history ul");
       const historyContainer = display_element.querySelector("#jatos-chat-history");
       const msgTextInput = display_element.querySelector("#jatos-msgText");
       const sendMsgButton = display_element.querySelector("#jatos-sendMsgButton");
       const endStudyButton = display_element.querySelector("#jatos-endStudyButton");
+      const quitStudyButton = display_element.querySelector("#jatos-quitStudyButton");
       this.trial_data.chat_log = [];
-      this.trial_data.events = [];
-      const appendToHistory = (text, color, isEvent = false) => {
+      const appendToHistory = (full_text, raw_text, sender, color, isEvent = false) => {
         const listItem = document.createElement("li");
-        listItem.textContent = text;
+        listItem.textContent = full_text;
         listItem.style.color = color;
         historyElement.appendChild(listItem);
         historyContainer.scrollTop = historyContainer.scrollHeight;
+        let curr_timestamp = (/* @__PURE__ */ new Date()).toISOString();
+        let curr_chat_log = {
+          timestamp: curr_timestamp,
+          full_message: full_text,
+          message: raw_text,
+          color
+        };
         if (!isEvent) {
-          this.trial_data.chat_log.push({
-            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-            message: text,
-            color
-          });
+          curr_chat_log["sender"] = sender;
+          this.trial_data.chat_senders.push(sender);
+        } else {
+          curr_chat_log["sender"] = "system" + this.jatos.groupResultId, this.trial_data.chat_senders.push("system" + this.jatos.groupResultId);
         }
+        this.trial_data.chat_log.push(curr_chat_log);
+        this.trial_data.chat_timestamps.push(curr_timestamp);
+        this.trial_data.chat_messages.push(raw_text);
+        console.log(curr_chat_log);
       };
       const getTime = () => {
         return new Date((/* @__PURE__ */ new Date()).getTime()).toUTCString();
       };
       const stringToColour = (str) => {
-        if (!str) return defaultColor;
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-          hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        let colour = "#";
-        for (let i = 0; i < 3; i++) {
-          const value = hash >> i * 8 & 255;
-          colour += ("00" + value.toString(16)).substr(-2);
-        }
-        return colour;
+        var color = Math.floor(Math.abs(Math.sin(parseInt(str)) * 16777215) % 16777215).toString(16);
+        return "#" + color;
       };
       const onOpen = () => {
         const message = "You are connected.";
-        appendToHistory(message, defaultColor, true);
-        this.trial_data.events.push({ type: "jatos_connected", timestamp: (/* @__PURE__ */ new Date()).toISOString(), message });
+        appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
         msgTextInput.focus();
       };
       const onClose = () => {
         const message = "You are disconnected.";
-        appendToHistory(message, defaultColor, true);
-        this.trial_data.events.push({ type: "jatos_disconnected", timestamp: (/* @__PURE__ */ new Date()).toISOString(), message });
+        appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
         msgTextInput.disabled = true;
         sendMsgButton.disabled = true;
       };
       const onError = (error) => {
         const message = "An error occurred: " + error;
-        appendToHistory(message, errorColor, true);
-        this.trial_data.events.push({ type: "jatos_error", timestamp: (/* @__PURE__ */ new Date()).toISOString(), error: String(error) });
+        appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       };
       const onMessage = (chatBundle) => {
         const memberId = chatBundle && chatBundle.groupMemberId ? chatBundle.groupMemberId : "UnknownMember";
         const receivedMsg = chatBundle && chatBundle.msg ? chatBundle.msg : "[empty message]";
         const msg = `${getTime()} - ${memberId}: ${receivedMsg}`;
-        const color = stringToColour(memberId);
-        appendToHistory(msg, color);
+        const color = stringToColour(String(memberId));
+        appendToHistory(msg, receivedMsg, memberId, color, false);
       };
       const onMemberOpen = (memberId) => {
         const message = `A new member joined: ${memberId}`;
-        appendToHistory(message, defaultColor, true);
-        this.trial_data.events.push({ type: "jatos_member_joined", timestamp: (/* @__PURE__ */ new Date()).toISOString(), memberId });
+        appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       };
       const onMemberClose = (memberId) => {
         const message = `${memberId} left`;
-        appendToHistory(message, defaultColor, true);
-        this.trial_data.events.push({ type: "jatos_member_left", timestamp: (/* @__PURE__ */ new Date()).toISOString(), memberId });
+        appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       };
       this.jatos.onLoad(() => {
         this.jatos.joinGroup({
@@ -185,8 +187,7 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
         });
         this.jatos.onError((error) => {
           const message = "jatos.onError (global): " + error;
-          appendToHistory(message, errorColor, true);
-          this.trial_data.events.push({ type: "jatos_global_error", timestamp: (/* @__PURE__ */ new Date()).toISOString(), error: String(error) });
+          appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
         });
       });
       msgTextInput.addEventListener("keypress", (event) => {
@@ -213,22 +214,47 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
         } catch (e) {
           onError("Failed to send message via JATOS: " + (e.message || e));
         }
-        appendToHistory(`${getTime()} - You: ${msg}`, stringToColour(memberId));
+        appendToHistory(`${getTime()} - You: ${msg}`, msg, memberId, stringToColour(String(memberId)));
       });
       endStudyButton.addEventListener("click", () => {
-        const data = {
-          chat_log_structured: this.trial_data.chat_log,
-          jatos_events: this.trial_data.events,
+        const trial_data = {
+          chat_log: this.trial_data.chat_log,
+          chat_timestamps: this.trial_data.chat_timestamps,
+          chat_senders: this.trial_data.chat_senders,
+          chat_messages: this.trial_data.chat_messages,
           participant_id: this.jatos && this.jatos.workerId ? this.jatos.workerId : null,
           group_member_id: this.jatos && this.jatos.groupMemberId ? this.jatos.groupMemberId : null,
           group_id: this.jatos && this.jatos.groupResultId ? this.jatos.groupResultId : null
         };
-        display_element.innerHTML = "";
-        this.jsPsych.finishTrial(data);
-        if (trial.on_finish) {
-          trial.on_finish(data);
-        }
+        this.jsPsych.finishTrial(trial_data);
       });
+      quitStudyButton.addEventListener(
+        "click",
+        () => {
+          var answer = confirm(this.params.quit_alert_text);
+          if (answer) {
+            let ppt_member_id = String(this.jatos.groupMemberId);
+            let ppt_idx_bool = [];
+            this.trial_data.chat_senders.forEach((sender_id, index) => {
+              if (sender_id === ppt_member_id) {
+                ppt_idx_bool.push(true);
+              } else {
+                ppt_idx_bool.push(false);
+              }
+            });
+            for (let i = 0; i < ppt_idx_bool.length; i++) {
+              if (ppt_idx_bool[i]) {
+                this.trial_data.chat_timestamps[i] = "ppt withdrew";
+                this.trial_data.chat_messages[i] = "ppt withdrew";
+                this.trial_data.chat_log[i]["timestamp"] = "ppt withdrew";
+                this.trial_data.chat_log[i]["message"] = "ppt withdrew";
+                this.trial_data.chat_log[i]["color"] = "ppt withdrew";
+              }
+            }
+          }
+          this.jsPsych.finishTrial();
+        }
+      );
     }
   }
 
