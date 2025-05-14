@@ -104,34 +104,22 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   private messages: string[];
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
-
-    const html = `
-      <div id="jatos-chat-content">
-          <div class="pure-g">
-              <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
-                  <ul></ul>
-              </div>
-          </div>
-          <form id="jatos-sendMsgForm" class="pure-form">
-              <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${trial.prompt}">
-              <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${trial.button_label_send}</button>
-          </form>
-          <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${trial.button_label_end_study}</button>
-      </div>
-    `;
-    display_element.innerHTML = html
-
-    function showMemberStatus() {
-      // @ts-expect-error
-      if (jatos.groupChannels && jatos.groupChannels.length > 0) {
-      // @ts-expect-error
-        display_element.querySelector("#jspsych-member-counter").textContent = jatos.groupChannels.length;
-      } else {
-        display_element.querySelector("#jspsych-member-counter").textContent = "0"
-      }
-    }
-
-    showMemberStatus()
+    // --- HTML Structure ---
+    let html = `
+        <div id="jatos-chat-content">
+            <div class="pure-g">
+                <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+                    <ul></ul>
+                </div>
+            </div>
+            <form id="jatos-sendMsgForm" class="pure-form">
+                <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${trial.prompt}">
+                <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${trial.button_label_send}</button>
+            </form>
+            <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${trial.button_label_end_study}</button>
+        </div>
+      `;
+    display_element.innerHTML = html;
 
     // --- Chat Logic ---
     const defaultColor = "#aaa";
