@@ -2,9 +2,9 @@
 
 1. Build the plugin using `npm install` and `npm run build`
 
-2. Go to `plugin-jatos-waiting-room/dist` and copy the file `index.browser.js`
+2. Go to `plugin-jatos-group-chat/dist` and copy the file `index.browser.js`
 
-3. Go to `test-jatos-waiting-room/jspsych` and paste the file, rename to `plugin-jatos-waiting-room.js`
+3. Go to `test-jatos-group-chat/jspsych` and paste the file, rename to `plugin-jatos-group-chat.js`
 
 ## Run on local server
 
@@ -12,7 +12,7 @@
 
 2. Click on `Studies` > `New Study` on the JATOS server homepage. This will create a new folder in the `study-assets-root` folder, with a randomly-generated UUID.
 
-3. Copy the **content** of `test-jatos-waiting-room` into this new folder (should have a `jspsych` folder and a `index.html` file).
+3. Copy the **content** of `test-jatos-group-chat` into this new folder (should have a `jspsych` folder and a `index.html` file).
 
 4. On the JATOS server homepage, click on `Properties`, then make sure `Group Study` is toggled on.
 
