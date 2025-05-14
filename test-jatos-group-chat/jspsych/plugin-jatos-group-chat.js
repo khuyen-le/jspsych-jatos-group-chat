@@ -1,10 +1,10 @@
-var jsPsychPluginJatosWaitingRoom = (function (jspsych) {
+var jsPsychPluginJatosGroupChat = (function (jspsych) {
   'use strict';
 
   var version = "0.0.1";
 
   const info = {
-    name: "plugin-jatos-waiting-room",
+    name: "plugin-jatos-group-chat",
     version,
     parameters: {
       /** Provide a clear description of the parameter_name that could be used as documentation. We will eventually use these comments to automatically build documentation and produce metadata. */
@@ -42,11 +42,11 @@ var jsPsychPluginJatosWaitingRoom = (function (jspsych) {
     },
     // When you run build on your plugin, citations will be generated here based on the information in the CITATION.cff file.
     citations: {
-      "apa": "Khuyen Le Khuyen Le, K. L. (2023). {title}. Journal for Open Source Software, 1(1), 1. https://doi.org/10.21105/joss.12345 ",
-      "bibtex": "@article{Khuyen2023title, 	author = {Khuyen Le Khuyen Le, Khuyen Le}, 	journal = {Journal for Open Source Software}, 	doi = {10.21105/joss.12345}, 	issn = {1234-5678}, 	number = {1}, 	year = {2023}, 	month = {may 11}, 	pages = {1}, 	publisher = {Open Journals}, 	title = {\\textbraceleft{}title\\textbraceright{}}, 	url = {{linkToPublicationInJournal}}, 	volume = {1}, }  "
+      "apa": "Martin Zettersten, Avery Yanowitz, Jenny Lee, Khuyen Le, Kushin Mukherjee, Steven Martinez Martin Zettersten, Avery Yanowitz, Jenny Lee, Khuyen Le, Kushin Mukherjee, Steven Martinez, M. Z. A. Y. J. L. K. L. K. M. S. M. (2023). {title}. Journal for Open Source Software, 1(1), 1. https://doi.org/10.21105/joss.12345 ",
+      "bibtex": "@article{Martin2023title, 	author = {Martin Zettersten, Avery Yanowitz, Jenny Lee, Khuyen Le, Kushin Mukherjee, Steven Martinez Martin Zettersten, Avery Yanowitz, Jenny Lee, Khuyen Le, Kushin Mukherjee, Steven Martinez, Martin Zettersten, Avery Yanowitz, Jenny Lee, Khuyen Le, Kushin Mukherjee, Steven Martinez}, 	journal = {Journal for Open Source Software}, 	doi = {10.21105/joss.12345}, 	issn = {1234-5678}, 	number = {1}, 	year = {2023}, 	month = {may 11}, 	pages = {1}, 	publisher = {Open Journals}, 	title = {\\textbraceleft{}title\\textbraceright{}}, 	url = {{linkToPublicationInJournal}}, 	volume = {1}, }  "
     }
   };
-  class JatosWaitingRoomPlugin {
+  class JatosGroupChatPlugin {
     constructor(jsPsych) {
       this.jsPsych = jsPsych;
     }
@@ -104,7 +104,7 @@ var jsPsychPluginJatosWaitingRoom = (function (jspsych) {
     }
   }
 
-  return JatosWaitingRoomPlugin;
+  return JatosGroupChatPlugin;
 
 })(jsPsychModule);
 //# sourceMappingURL=index.browser.js.map

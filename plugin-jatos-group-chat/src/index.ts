@@ -3,7 +3,7 @@ import { JsPsych, JsPsychPlugin, ParameterType, TrialType } from "jspsych";
 import { version } from "../package.json";
 
 const info = <const>{
-  name: "plugin-jspsych-jatos-waiting-room",
+  name: "plugin-jatos-group-chat",
   version: version,
   parameters: {
     /** Provide a clear description of the parameter_name that could be used as documentation. We will eventually use these comments to automatically build documentation and produce metadata. */
@@ -42,32 +42,43 @@ const info = <const>{
 type Info = typeof info;
 
 /**
- * **plugin-jspsych-jatos-waiting-room**
+ * **plugin-jatos-group-chat**
  *
- * Implements a JATOS waiting room.
+ * This plugin implements a waiting room based on JATOS functionality.
  *
  * @author Khuyen Le
- * @see {@link /plugin-jspsych-jatos-waiting-room/README.md}}
+ * @see {@link /plugin-jatos-group-chat/README.md}}
  */
-class JspsychJatosWaitingRoomPlugin implements JsPsychPlugin<Info> {
+class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   static info = info;
 
   constructor(private jsPsych: JsPsych) {}
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
-    var n_clicks = 0
-    const html = `<div>
-      <div id="jspsych-jatos-waiting-text">${trial.wait_text}</div>
-      <button id="jspsych-jatos-join-btn" class="jspsych-btn">${trial.join_text}</button>
-      <button id="jspsych-jatos-leave-btn" class="jspsych-btn">${trial.leave_text}</button>
-      <p><span id="memberCounter">0</span>&nbsp;Members</p>
 
+    const html = `<div>
+      <div id="jspsych-waiting-text">${trial.wait_text}</div>
+      <button id="jspsych-join-btn" class="jspsych-btn">${trial.join_text}</button>
+      <button id="jspsych-leave-btn" class="jspsych-btn">${trial.leave_text}</button>
+      <p><span id="jspsych-member-counter">0</span>&nbsp;Members</p>
       </div>
     `
     display_element.innerHTML = html
-    var join_button = display_element.querySelector("#jspsych-jatos-join-btn");
+
+    function showMemberStatus() {
+      // @ts-expect-error
+      if (jatos.groupChannels && jatos.groupChannels.length > 0) {
+      // @ts-expect-error
+        display_element.querySelector("#jspsych-member-counter").textContent = jatos.groupChannels.length;
+      } else {
+        display_element.querySelector("#jspsych-member-counter").textContent = "0"
+      }
+    }
+
+    showMemberStatus()
+
+    var join_button = display_element.querySelector("#jspsych-join-btn");
     join_button.addEventListener("click", () => {
-      // alert('Join button was clicked!');
       // @ts-expect-error
       jatos.joinGroup({
         "onOpen": onOpen,
@@ -76,18 +87,7 @@ class JspsychJatosWaitingRoomPlugin implements JsPsychPlugin<Info> {
       });
     });
 
-    // What todo when jatos.js produces an error
-    // @ts-expect-error
-    jatos.onError(function(errorMsg) {
-      console.log("Error: " + errorMsg);
-    });
-
-    var leave_button = display_element.querySelector("#jspsych-jatos-leave-btn");
-    leave_button.addEventListener("click", () => {
-      alert('Leave button was clicked!');
-      n_clicks++;
-    });
-
+    /** These three functions are mainly to troubleshoot, remove in the final version */
     function onOpen() {
       showMemberStatus()
       console.log("You joined a group and opened a group channel");
@@ -102,20 +102,24 @@ class JspsychJatosWaitingRoomPlugin implements JsPsychPlugin<Info> {
       showMemberStatus()
       console.log("You received a message: " + msg);
     }
-
-    function showMemberStatus() {
-      // @ts-expect-error
-      if (jatos.groupChannels && jatos.groupChannels.length > 0) {
-      // @ts-expect-error
-        display_element.querySelector("#memberCounter").textContent = jatos.groupChannels.length;
-      } else {
-        display_element.querySelector("#memberCounter").textContent = "0"
-      }
-    }
-
-    showMemberStatus()
     
-    if(n_clicks > 10){
+    // What todo when jatos.js produces an error
+    // @ts-expect-error
+    jatos.onError(function(errorMsg) {
+      console.log("Error: " + errorMsg);
+    });
+    
+    var leave_button = display_element.querySelector("#jspsych-leave-btn");
+    leave_button.addEventListener("click", () => {
+      // data saving
+      var trial_data = {
+        data1: 99, // Make sure this type and name matches the information for data1 in the data object contained within the info const.
+      };
+      // end trial
+      this.jsPsych.finishTrial(trial_data);
+    });
+
+    if(1 < 0){
       // data saving
       var trial_data = {
         data1: 99, // Make sure this type and name matches the information for data1 in the data object contained within the info const.
@@ -123,8 +127,7 @@ class JspsychJatosWaitingRoomPlugin implements JsPsychPlugin<Info> {
       // end trial
       this.jsPsych.finishTrial(trial_data);
     }
-
   }
 }
 
-export default JspsychJatosWaitingRoomPlugin;
+export default JatosGroupChatPlugin;
