@@ -7,37 +7,62 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
     name: "plugin-jatos-group-chat",
     version,
     parameters: {
-      /** Provide a clear description of the parameter_name that could be used as documentation. We will eventually use these comments to automatically build documentation and produce metadata. */
-      min_n_people: {
-        type: jspsych.ParameterType.INT,
-        default: 2
-      },
-      join_text: {
+      /** All the text */
+      end_text: {
         type: jspsych.ParameterType.STRING,
         // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
-        default: "JOIN"
+        default: "End Study"
       },
-      leave_text: {
+      quit_text: {
         type: jspsych.ParameterType.STRING,
-        // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
-        default: "LEAVE"
+        default: "Quit Study"
       },
-      wait_text: {
+      quit_alert_text: {
         type: jspsych.ParameterType.STRING,
-        // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
-        default: "Waiting..."
+        default: "Are you sure you want to quit the study?"
       },
-      n_people_waiting: {
-        type: jspsych.ParameterType.INT,
-        // BOOL, STRING, INT, FLOAT, FUNCTION, KEY, KEYS, SELECT, HTML_STRING, IMAGE, AUDIO, VIDEO, OBJECT, COMPLEX
-        default: 0
+      send_text: {
+        type: jspsych.ParameterType.STRING,
+        default: "Send"
+      },
+      message_placeholder: {
+        type: jspsych.ParameterType.STRING,
+        default: "Your message ..."
+      },
+      connected_text: {
+        type: jspsych.ParameterType.STRING,
+        default: "You are connected."
+      },
+      new_member_text: {
+        type: jspsych.ParameterType.STRING,
+        default: "A new member joined:"
       }
+      /** possible extensions: max number of people, etc. */
     },
     data: {
-      /** actually doesn't need any data back, I think... */
-      /** Provide a clear description of the data1 that could be used as documentation. We will eventually use these comments to automatically build documentation and produce metadata. */
-      data1: {
-        type: jspsych.ParameterType.INT
+      chat_history_raw: {
+        type: jspsych.ParameterType.STRING,
+        description: "An array of strings, where each string is a raw message from the chat history display."
+      },
+      chat_log_structured: {
+        type: jspsych.ParameterType.OBJECT,
+        description: "An array of objects, each representing a chat message with timestamp, message content, and color."
+      },
+      jatos_events: {
+        type: jspsych.ParameterType.OBJECT,
+        description: "An array of objects, logging JATOS-specific events like connections, disconnections, errors, and member joins/leaves."
+      },
+      participant_id: {
+        type: jspsych.ParameterType.STRING,
+        description: "JATOS worker ID, if available."
+      },
+      group_member_id: {
+        type: jspsych.ParameterType.STRING,
+        description: "JATOS group member ID, if available."
+      },
+      group_id: {
+        type: jspsych.ParameterType.STRING,
+        description: "JATOS group result ID, if available."
       }
     },
     // When you run build on your plugin, citations will be generated here based on the information in the CITATION.cff file.
@@ -49,57 +74,160 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
   class JatosGroupChatPlugin {
     constructor(jsPsych) {
       this.jsPsych = jsPsych;
+      this.jsPsych = jsPsych;
+      this.trial_data = {
+        chat_log: [],
+        events: []
+      };
+      this.jatos = window.jatos;
     }
     static {
       this.info = info;
     }
     trial(display_element, trial) {
-      const html = `<div>
-      <div id="jspsych-waiting-text">${trial.wait_text}</div>
-      <button id="jspsych-join-btn" class="jspsych-btn">${trial.join_text}</button>
-      <button id="jspsych-leave-btn" class="jspsych-btn">${trial.leave_text}</button>
-      <p><span id="jspsych-member-counter">0</span>&nbsp;Members</p>
-      </div>
-    `;
+      let html = `
+        <div id="jatos-chat-content">
+            <div class="pure-g">
+                <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+                    <ul></ul>
+                </div>
+            </div>
+            <form id="jatos-sendMsgForm" class="pure-form">
+                <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${trial.prompt}">
+                <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${trial.button_label_send}</button>
+            </form>
+            <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${trial.button_label_end_study}</button>
+        </div>
+      `;
       display_element.innerHTML = html;
-      function showMemberStatus() {
-        if (jatos.groupChannels && jatos.groupChannels.length > 0) {
-          display_element.querySelector("#jspsych-member-counter").textContent = jatos.groupChannels.length;
-        } else {
-          display_element.querySelector("#jspsych-member-counter").textContent = "0";
+      const defaultColor = "#aaa";
+      const errorColor = "#f00";
+      const historyElement = display_element.querySelector("#jatos-chat-history ul");
+      const historyContainer = display_element.querySelector("#jatos-chat-history");
+      const msgTextInput = display_element.querySelector("#jatos-msgText");
+      const sendMsgButton = display_element.querySelector("#jatos-sendMsgButton");
+      const endStudyButton = display_element.querySelector("#jatos-endStudyButton");
+      this.trial_data.chat_log = [];
+      this.trial_data.events = [];
+      const appendToHistory = (text, color, isEvent = false) => {
+        const listItem = document.createElement("li");
+        listItem.textContent = text;
+        listItem.style.color = color;
+        historyElement.appendChild(listItem);
+        historyContainer.scrollTop = historyContainer.scrollHeight;
+        if (!isEvent) {
+          this.trial_data.chat_log.push({
+            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+            message: text,
+            color
+          });
         }
-      }
-      showMemberStatus();
-      var join_button = display_element.querySelector("#jspsych-join-btn");
-      join_button.addEventListener("click", () => {
-        jatos.joinGroup({
-          "onOpen": onOpen,
-          "onMemberOpen": onMemberOpen,
-          "onMessage": onMessage
+      };
+      const getTime = () => {
+        return new Date((/* @__PURE__ */ new Date()).getTime()).toUTCString();
+      };
+      const stringToColour = (str) => {
+        if (!str) return defaultColor;
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        let colour = "#";
+        for (let i = 0; i < 3; i++) {
+          const value = hash >> i * 8 & 255;
+          colour += ("00" + value.toString(16)).substr(-2);
+        }
+        return colour;
+      };
+      const onOpen = () => {
+        const message = "You are connected.";
+        appendToHistory(message, defaultColor, true);
+        this.trial_data.events.push({ type: "jatos_connected", timestamp: (/* @__PURE__ */ new Date()).toISOString(), message });
+        msgTextInput.focus();
+      };
+      const onClose = () => {
+        const message = "You are disconnected.";
+        appendToHistory(message, defaultColor, true);
+        this.trial_data.events.push({ type: "jatos_disconnected", timestamp: (/* @__PURE__ */ new Date()).toISOString(), message });
+        msgTextInput.disabled = true;
+        sendMsgButton.disabled = true;
+      };
+      const onError = (error) => {
+        const message = "An error occurred: " + error;
+        appendToHistory(message, errorColor, true);
+        this.trial_data.events.push({ type: "jatos_error", timestamp: (/* @__PURE__ */ new Date()).toISOString(), error: String(error) });
+      };
+      const onMessage = (chatBundle) => {
+        const memberId = chatBundle && chatBundle.groupMemberId ? chatBundle.groupMemberId : "UnknownMember";
+        const receivedMsg = chatBundle && chatBundle.msg ? chatBundle.msg : "[empty message]";
+        const msg = `${getTime()} - ${memberId}: ${receivedMsg}`;
+        const color = stringToColour(memberId);
+        appendToHistory(msg, color);
+      };
+      const onMemberOpen = (memberId) => {
+        const message = `A new member joined: ${memberId}`;
+        appendToHistory(message, defaultColor, true);
+        this.trial_data.events.push({ type: "jatos_member_joined", timestamp: (/* @__PURE__ */ new Date()).toISOString(), memberId });
+      };
+      const onMemberClose = (memberId) => {
+        const message = `${memberId} left`;
+        appendToHistory(message, defaultColor, true);
+        this.trial_data.events.push({ type: "jatos_member_left", timestamp: (/* @__PURE__ */ new Date()).toISOString(), memberId });
+      };
+      this.jatos.onLoad(() => {
+        this.jatos.joinGroup({
+          onOpen,
+          onClose,
+          onError,
+          onMessage,
+          onMemberOpen,
+          onMemberClose
+        });
+        this.jatos.onError((error) => {
+          const message = "jatos.onError (global): " + error;
+          appendToHistory(message, errorColor, true);
+          this.trial_data.events.push({ type: "jatos_global_error", timestamp: (/* @__PURE__ */ new Date()).toISOString(), error: String(error) });
         });
       });
-      function onOpen() {
-        showMemberStatus();
-        console.log("You joined a group and opened a group channel");
-      }
-      function onMemberOpen(memberId) {
-        showMemberStatus();
-        console.log("In our group another member (ID " + memberId + ") opened a group channel");
-      }
-      function onMessage(msg) {
-        showMemberStatus();
-        console.log("You received a message: " + msg);
-      }
-      jatos.onError(function(errorMsg) {
-        console.log("Error: " + errorMsg);
+      msgTextInput.addEventListener("keypress", (event) => {
+        if (event.key === "Enter" || event.which === 13) {
+          event.preventDefault();
+          sendMsgButton.click();
+        }
       });
-      var leave_button = display_element.querySelector("#jspsych-leave-btn");
-      leave_button.addEventListener("click", () => {
-        var trial_data2 = {
-          data1: 99
-          // Make sure this type and name matches the information for data1 in the data object contained within the info const.
+      sendMsgButton.addEventListener("click", () => {
+        const msg = msgTextInput.value.trim();
+        if (!msg) {
+          return;
+        }
+        msgTextInput.value = "";
+        const memberId = this.jatos && this.jatos.groupMemberId ? this.jatos.groupMemberId : "LocalUser";
+        const chatBundle = {
+          msg,
+          groupMemberId: memberId
         };
-        this.jsPsych.finishTrial(trial_data2);
+        let messageSentViaJatos = false;
+        try {
+          this.jatos.sendGroupMsg(chatBundle);
+          messageSentViaJatos = true;
+        } catch (e) {
+          onError("Failed to send message via JATOS: " + (e.message || e));
+        }
+        appendToHistory(`${getTime()} - You: ${msg}`, stringToColour(memberId));
+      });
+      endStudyButton.addEventListener("click", () => {
+        const data = {
+          chat_log_structured: this.trial_data.chat_log,
+          jatos_events: this.trial_data.events,
+          participant_id: this.jatos && this.jatos.workerId ? this.jatos.workerId : null,
+          group_member_id: this.jatos && this.jatos.groupMemberId ? this.jatos.groupMemberId : null,
+          group_id: this.jatos && this.jatos.groupResultId ? this.jatos.groupResultId : null
+        };
+        display_element.innerHTML = "";
+        this.jsPsych.finishTrial(data);
+        if (trial.on_finish) {
+          trial.on_finish(data);
+        }
       });
     }
   }
