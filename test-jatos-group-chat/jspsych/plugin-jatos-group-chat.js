@@ -74,6 +74,9 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
       join_button.addEventListener("click", () => {
         jatos.joinGroup({
           "onOpen": onOpen,
+          "onClose": onClose,
+          "onError": onError,
+          "onGroupSession": onGroupSession,
           "onMemberOpen": onMemberOpen,
           "onMessage": onMessage
         });
@@ -81,6 +84,19 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
       function onOpen() {
         showMemberStatus();
         console.log("You joined a group and opened a group channel");
+      }
+      function onClose() {
+        console.log("You are disconnected.");
+      }
+      function onError() {
+        jatos.onError(function(errorMsg) {
+          console.log("Error: " + errorMsg);
+        });
+      }
+      function onGroupSession() {
+        var chatBundle = jatos.groupSession.find(path);
+        var timestamp = path.split('/ts')[1];
+        console.log(timestamp+"  "+chatBundle);
       }
       function onMemberOpen(memberId) {
         showMemberStatus();
@@ -90,9 +106,6 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
         showMemberStatus();
         console.log("You received a message: " + msg);
       }
-      jatos.onError(function(errorMsg) {
-        console.log("Error: " + errorMsg);
-      });
       var leave_button = display_element.querySelector("#jspsych-leave-btn");
       leave_button.addEventListener("click", () => {
         var trial_data2 = {
