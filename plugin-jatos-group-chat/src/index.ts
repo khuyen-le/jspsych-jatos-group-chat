@@ -34,6 +34,10 @@ const info = <const>{
     new_member_text: { 
       type: ParameterType.STRING,
       default: "A new member joined:",
+    },
+    username_generator_function: {
+      type: ParameterType.FUNCTION,
+      default: null, // If left undefined, will just use JATOS group member ID
     }
     /** possible extensions: max number of people, etc. */
   },
@@ -87,6 +91,7 @@ interface ChatData {
  * @author Khuyen Le
  * @see {@link /plugin-jatos-group-chat/README.md}}
  */
+
 class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   static info = info;
   trial_data: ChatData;
@@ -105,6 +110,17 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   }
 
   private params: TrialType<Info>;
+
+  private genMemberId(jatosGroupId : any): string {
+    let memberId : string;
+    let gen_func = this.params.username_generator_function;
+    if (this.jatos && jatosGroupId) {
+      memberId = gen_func ? gen_func(jatosGroupId) : jatosGroupId;
+    } else {
+      memberId = "LocalUser";
+    }
+    return memberId;
+  }
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
     this.params = trial;
@@ -152,7 +168,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
      */
     this.trial_data.chat_log = [];
 
-    const appendToHistory = (text, color, isEvent = false) => {
+    const appendToHistory = (text: string, color: string, isEvent = false) => 
        /** 
        * Defines constant that will iteratively append corresponding timestamps, messages, and member IDs to the chat log trial array *
        */
@@ -164,7 +180,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       if (!isEvent) {
         this.trial_data.chat_log.push({
           timestamp: new Date().toISOString(),
-          sender: this.jatos.groupMemberId,
+          sender: this.genMemberId(this.jatos.groupMemberId),
           message: text,
           color: color
         });
@@ -186,11 +202,12 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       return new Date(new Date().getTime()).toUTCString();
     };
 
+    const stringToColour = (str: string) => {
 
      /** 
      * Defines random color that will later be used for each unique member ID *
      */
-    const stringToColour = (str) => {
+
       if (!str) return defaultColor;
       let hash = 0;
       for (let i = 0; i < str.length; i++) {
@@ -228,7 +245,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       sendMsgButton.disabled = true;
     };
 
-    const onError = (error) => {
+    const onError = (error: string) => {
        /** 
        * Generates message that an error has occurred *
        * Appends error message to chat log history *
@@ -238,7 +255,8 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       //this.trial_data.events.push({ type: "jatos_error", timestamp: new Date().toISOString(), error: String(error) });
     };
 
-    const onMessage = (chatBundle) => {
+    const onMessage = (chatBundle: { groupMemberId: string; msg: string; }) => {
+      const memberId : string = chatBundle && chatBundle.groupMemberId ? chatBundle.groupMemberId : "UnknownMember";
        /** 
        * Creates constant to define member ID in the chat *
        * Creates constant to define a received message *
@@ -246,31 +264,28 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
        * Assigns random color to each member ID *
        * Appends message and member ID to chat log history *
        */ 
-      const memberId = chatBundle && chatBundle.groupMemberId ? chatBundle.groupMemberId : "UnknownMember";
       const receivedMsg = chatBundle && chatBundle.msg ? chatBundle.msg : "[empty message]";
       const msg = `${getTime()} - ${memberId}: ${receivedMsg}`;
       const color = stringToColour(memberId);
       appendToHistory(msg, color);
     };
 
-    const onMemberOpen = (memberId) => {
+    const onMemberOpen = (memberId: string) => {
        /** 
        * Generates message indicating that a new member has joined the group chat along with their member ID *
        * Appends ID of new member and timestamp to chat log history *
        */ 
       const message = `A new member joined: ${memberId}`;
       appendToHistory(message, defaultColor, true);
-      //this.trial_data.events.push({ type: "jatos_member_joined", timestamp: new Date().toISOString(), memberId: memberId });
     };
 
-    const onMemberClose = (memberId) => {
+    const onMemberClose = (memberId: string) => {
        /** 
        * Generates message indicating that a specific member has left the group chat *
        * Appends ID of member who left and timestamp to chat log history *
        */ 
       const message = `${memberId} left`;
       appendToHistory(message, defaultColor, true);
-      //this.trial_data.events.push({ type: "jatos_member_left", timestamp: new Date().toISOString(), memberId: memberId });
     };
 
     // --- JATOS Integration ---
@@ -286,7 +301,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       });
 
       // JATOS global error handler (distinct from channel errors)
-      this.jatos.onError((error) => {
+      this.jatos.onError((error: string) => {
         const message = "jatos.onError (global): " + error;
         appendToHistory(message, errorColor, true);
         //this.trial_data.events.push({ type: "jatos_global_error", timestamp: new Date().toISOString(), error: String(error) });
@@ -311,12 +326,10 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       if (!msg) {
         return;
       }
-
-      /* If groupMemberID variable exists, define memberID as groupMemberID, else, define memberID constant as 'LocalUser' */
-      /* Organize chatBundle constant to reflect the message and the corresponding member ID */
+      
       msgTextInput.value = "";
-      const memberId = (this.jatos && this.jatos.groupMemberId) ? this.jatos.groupMemberId : "LocalUser";
-      const chatBundle = {
+      const memberId : string = this.genMemberId(this.jatos.groupMemberId);
+      const chatBundle : object = {
         msg: msg,
         groupMemberId: memberId,
       };
@@ -324,21 +337,14 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       /* Declare messageSentViaJatos as 'false'*/
       let messageSentViaJatos = false;
         
-        /* Sends the message and records any errors that may arise */
-        // if (this.jatos.group && typeof this.jatos.group.isChannelOpen === 'function' && this.jatos.group.isChannelOpen()) {
-          try {
-            this.jatos.sendGroupMsg(chatBundle);
-            messageSentViaJatos = true;
-          } catch (e) {
-            onError("Failed to send message via JATOS: " + (e.message || e));
-          }
-        // } else if (!this.jatos.group) {
-        //   appendToHistory("Cannot send message: JATOS group object not available.", errorColor, true);
-        // } else {
-        //   appendToHistory("Cannot send message: JATOS group channel not open.", errorColor, true);
-        // }
+      /* Sends the message and records any errors that may arise */
+      try {
+        this.jatos.sendGroupMsg(chatBundle);
+        messageSentViaJatos = true;
+      } catch (e) {
+        onError("Failed to send message via JATOS: " + (e.message || e));
+      }      
       
-
       appendToHistory(`${getTime()} - You: ${msg}`, stringToColour(memberId));
     });
 
@@ -352,7 +358,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
         chat_senders: this.trial_data.chat_senders,
         chat_messages: this.trial_data.chat_messages,
         participant_id: (this.jatos && this.jatos.workerId) ? this.jatos.workerId : null,
-        group_member_id: (this.jatos && this.jatos.groupMemberId) ? this.jatos.groupMemberId : null,
+        group_member_id: this.genMemberId(this.jatos.groupMemberId),
         group_id: (this.jatos && this.jatos.groupResultId) ? this.jatos.groupResultId : null,
       };
       this.jsPsych.finishTrial(trial_data);
@@ -365,7 +371,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       var answer = confirm(this.params.quit_alert_text)
       if (answer){
         // get the member id of the participant who is quitting
-        let ppt_member_id = this.jatos.groupMemberId;
+        let ppt_member_id = this.genMemberId(this.jatos.groupMemberId);
         // boolean array, store True for match, False for no match
         // this implementation allows the function to run in O(n)
         let ppt_idx_bool = [];
@@ -389,7 +395,6 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     })
 
   }
-
 
 }
 
