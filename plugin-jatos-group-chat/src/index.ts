@@ -111,15 +111,17 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
   private params: TrialType<Info>;
 
-  private genMemberId(jatosGroupId : any): string {
+  private getMemberId(jatosGroupId : any): string {
     let memberId : string;
     let gen_func = this.params.username_generator_function;
     if (this.jatos && jatosGroupId) {
+      /* If gen_func is null (default value), return the raw group ID;
+      otherwise, apply the function to the group ID and return that. */
       memberId = gen_func ? gen_func(jatosGroupId) : jatosGroupId;
     } else {
       memberId = "LocalUser";
     }
-    return memberId;
+    return memberId as string;
   }
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
@@ -180,7 +182,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       if (!isEvent) {
         this.trial_data.chat_log.push({
           timestamp: new Date().toISOString(),
-          sender: this.genMemberId(this.jatos.groupMemberId),
+          sender: this.getMemberId(this.jatos.groupMemberId),
           message: text,
           color: color
         });
@@ -328,22 +330,18 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       }
       
       msgTextInput.value = "";
-      const memberId : string = this.genMemberId(this.jatos.groupMemberId);
+      const memberId : string = this.getMemberId(this.jatos.groupMemberId);
       const chatBundle : object = {
         msg: msg,
         groupMemberId: memberId,
       };
-
-      /* Declare messageSentViaJatos as 'false'*/
-      let messageSentViaJatos = false;
         
       /* Sends the message and records any errors that may arise */
       try {
         this.jatos.sendGroupMsg(chatBundle);
-        messageSentViaJatos = true;
       } catch (e) {
         onError("Failed to send message via JATOS: " + (e.message || e));
-      }      
+      }
       
       appendToHistory(`${getTime()} - You: ${msg}`, stringToColour(memberId));
     });
@@ -358,7 +356,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
         chat_senders: this.trial_data.chat_senders,
         chat_messages: this.trial_data.chat_messages,
         participant_id: (this.jatos && this.jatos.workerId) ? this.jatos.workerId : null,
-        group_member_id: this.genMemberId(this.jatos.groupMemberId),
+        group_member_id: this.getMemberId(this.jatos.groupMemberId),
         group_id: (this.jatos && this.jatos.groupResultId) ? this.jatos.groupResultId : null,
       };
       this.jsPsych.finishTrial(trial_data);
@@ -371,7 +369,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       var answer = confirm(this.params.quit_alert_text)
       if (answer){
         // get the member id of the participant who is quitting
-        let ppt_member_id = this.genMemberId(this.jatos.groupMemberId);
+        let ppt_member_id = this.getMemberId(this.jatos.groupMemberId);
         // boolean array, store True for match, False for no match
         // this implementation allows the function to run in O(n)
         let ppt_idx_bool = [];
