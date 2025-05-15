@@ -91,7 +91,27 @@
   font-size: 16px;
 }
 
-.jspsych-btn {
+#jatos-group-chat-input {
+  position: left
+}
+
+#jatos-chat-history li {
+  list-style-type: none;
+  padding-left: 0px;
+}
+
+#jatos-chat-history ul {
+  list-style-type: none;
+  padding-left: 0px;
+}
+
+#jatos-sendMsgForm{
+  padding: 10px 5px;
+  border: none;
+}
+
+#jatos-sendMsgButton {
+  position: right;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -110,6 +130,64 @@
   transition: background-color 0.3s ease;
 }
 
+#jatos-endStudyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px;
+  border-radius: 999px;
+  /* Makes it fully oval */
+  background-color: green;
+  color: #fff;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  transition: background-color 0.3s ease;
+}
+
+#jatos-quitStudyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px;
+  border-radius: 999px;
+  /* Makes it fully oval */
+  background-color: red;
+  color: #fff;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  transition: background-color 0.3s ease;
+}
+
+/* borrowing Bootstrap style for btn elements, but combining styles a bit */
+.jspsych-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  margin: 0px;
+  font-size: 14px;
+  font-weight: 400;
+  font-family: "Open Sans", "Arial", sans-serif;
+  cursor: pointer;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  background-image: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #333;
+  background-color: #fff;
+  border-color: #ccc;
+}
 
 .jspsych-btn:active {
   background-color: #ddd;

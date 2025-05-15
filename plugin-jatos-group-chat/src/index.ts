@@ -99,6 +99,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
   private params: TrialType<Info>;
   private members_in_chat: string[];
+  private curr_member_id: string;
 
   constructor(private jsPsych: JsPsych) {
     this.jsPsych = jsPsych;
@@ -112,15 +113,13 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     this.jatos = window.jatos; // Assuming JATOS is loaded globally
   }
 
-
-
-  private getMemberId(jatosGroupId : any): string {
+  private getMemberId(jatosGroupMemberId : any): string {
     let memberId : string;
     let gen_func = this.params.username_generator_function;
-    if (this.jatos && jatosGroupId) {
-      /* If gen_func is null (default value), return the raw group ID;
-      otherwise, apply the function to the group ID and return that. */
-      memberId = gen_func ? gen_func(jatosGroupId) : jatosGroupId;
+    if (this.jatos && jatosGroupMemberId) {
+      /* If gen_func is null (default value), return the raw group member ID;
+      otherwise, apply the function to the group member ID and return that. */
+      memberId = gen_func ? gen_func(jatosGroupMemberId) : jatosGroupMemberId;
     } else {
       memberId = "LocalUser";
     }
@@ -129,6 +128,8 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
     this.params = trial;
+    // this is here to support changing the way that memberids are generated, but breaks save and quit functionalities...
+    this.curr_member_id = this.getMemberId(this.jatos.groupMemberId)
     // --- HTML Structure ---
 
         /* jatos-chat-content: Defines ID attribute to reference content included in the chat
@@ -142,17 +143,15 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
     let html = `
       <div id="jatos-chat-content">
-          <div class="pure-g">
-              <div id="jatos-chat-history" class="pure-u-2-3" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
-                  <ul></ul>
-              </div>
+          <div id="jatos-chat-history" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+              <ul></ul>
           </div>
-          <form id="jatos-sendMsgForm" class="pure-form">
-              <input id="jatos-msgText" type="text" class="pure-input-2-3" placeholder="${this.params.message_placeholder}">
-              <button id="jatos-sendMsgButton" class="pure-button pure-button-primary" type='button'>${this.params.button_label_send}</button>
+          <form id="jatos-sendMsgForm">
+              <input id="jatos-msgText" class="jspsych-display-element" type="text" placeholder="${this.params.message_placeholder}">
+              <button id="jatos-sendMsgButton" class="jspsych-btn" type='button'>${this.params.button_label_send}</button>
           </form>
-          <button id="jatos-endStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${this.params.button_label_end_study}</button>
-          <button id="jatos-quitStudyButton" class="pure-button pure-button-primary" style="margin-top: 15px;">${this.params.button_label_quit_study}</button>
+          <button id="jatos-endStudyButton" class="jspsych-btn" style="margin-top: 15px;">${this.params.button_label_end_study}</button>
+          <button id="jatos-quitStudyButton" class="jspsych-btn" style="margin-top: 15px;">${this.params.button_label_quit_study}</button>
       </div>
     `;
     display_element.innerHTML = html;
@@ -413,8 +412,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       //keep the participant in the group if they just decided to end the study
       //this.jatos.leaveGroup();
       console.log(this.saveData())
-      appendToHistory(`${getTime()} - You: ${msg}`, stringToColour(memberId));
-      this.jsPsych.finishTrial(this.saveData());
+      //this.jsPsych.finishTrial(this.saveData());
     });
 
     quitStudyButton.addEventListener('click', () => {
@@ -429,7 +427,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
           this.members_in_chat.splice(remove_ppt_idx, 1);
         }
         console.log(this.saveData())
-        this.jsPsych.finishTrial(this.saveData());
+        //this.jsPsych.finishTrial(this.saveData());
         this.jatos.leaveGroup();
       }
 
