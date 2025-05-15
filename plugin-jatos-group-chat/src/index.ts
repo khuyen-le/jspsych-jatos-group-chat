@@ -94,8 +94,11 @@ interface ChatData {
 
 class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   static info = info;
-  trial_data: ChatData;
-  jatos: any;
+  private trial_data: ChatData;
+  jatos: any; 
+
+  private params: TrialType<Info>;
+  private members_in_chat: string[];
 
   constructor(private jsPsych: JsPsych) {
     this.jsPsych = jsPsych;
@@ -109,7 +112,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     this.jatos = window.jatos; // Assuming JATOS is loaded globally
   }
 
-  private params: TrialType<Info>;
+
 
   private getMemberId(jatosGroupId : any): string {
     let memberId : string;
@@ -170,30 +173,37 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
      */
     this.trial_data.chat_log = [];
 
-    const appendToHistory = (text: string, color: string, isEvent = false) => {
-       /** 
+    const appendToHistory = (full_text: string, raw_text: string, sender: string, color: string, isEvent = false) => {
+      /** 
        * Defines constant that will iteratively append corresponding timestamps, messages, and member IDs to the chat log trial array *
        */
       const listItem = document.createElement("li");
-      listItem.textContent = text;
+      listItem.textContent = full_text;
       listItem.style.color = color;
       historyElement.appendChild(listItem);
       historyContainer.scrollTop = historyContainer.scrollHeight;
-      if (!isEvent) {
-        this.trial_data.chat_log.push({
-          timestamp: new Date().toISOString(),
-          sender: this.getMemberId(this.jatos.groupMemberId),
-          message: text,
-          color: color
-        });
-      } else {
-        this.trial_data.chat_log.push({
-          timestamp: new Date().toISOString(),
-          sender: "system " + this.jatos.groupResultId,
-          message: text,
-          color: color
-        });
+      let curr_timestamp = new Date().toISOString();
+      let curr_chat_log = {
+        timestamp: curr_timestamp, 
+        full_message: full_text, 
+        message: raw_text,
+        color: color
       }
+
+      if (!isEvent) {
+       curr_chat_log['sender'] = sender 
+       this.trial_data.chat_senders.push(sender)
+      } else {
+        curr_chat_log['sender'] = "system" + this.jatos.groupResultId,
+        this.trial_data.chat_senders.push("system" + this.jatos.groupResultId)
+      }
+
+      this.trial_data.chat_log.push(curr_chat_log);
+      this.trial_data.chat_timestamps.push(curr_timestamp); 
+      this.trial_data.chat_messages.push(raw_text)
+
+      console.log(curr_chat_log)
+    
     };
 
 
@@ -204,23 +214,62 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       return new Date(new Date().getTime()).toUTCString();
     };
 
-    const stringToColour = (str: string) => {
-
-     /** 
-     * Defines random color that will later be used for each unique member ID *
-     */
-
-      if (!str) return defaultColor;
-      let hash = 0;
+    // if printing messages, force memberid to be strings
+    const stringToColour = (str) => {
+      // Similar to your original approach, using Math.sin for randomness
+      // Convert string to a numeric value first
+      let numericValue = 0;
       for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        numericValue += str.charCodeAt(i);
       }
-      let colour = '#';
-      for (let i = 0; i < 3; i++) {
-        const value = (hash >> (i * 8)) & 0xFF;
-        colour += ('00' + value.toString(16)).substr(-2);
+      
+      // Generate a random-feeling but deterministic color using sin
+      const randomVal = Math.abs(Math.sin(numericValue));
+      
+      // Generate HSL values with controlled ranges for readability
+      // Use the random value for the hue (0-360)
+      const h = Math.floor(randomVal * 360);
+      
+      // Keep saturation between 65-90% for vibrant but not overpowering colors
+      const s = 65 + Math.floor(randomVal * 25);
+      
+      // Keep lightness between 45-65% to ensure readability (not too dark/light)
+      const l = 45 + Math.floor(randomVal * 20);
+      
+      // Convert HSL to hex
+      return hslToHex(h, s, l);
+    };
+
+    // Helper function to convert HSL to hex
+    const hslToHex = (h, s, l) => {
+      s /= 100;
+      l /= 100;
+
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+      const m = l - c / 2;
+      
+      let r, g, b;
+      if (h >= 0 && h < 60) {
+        [r, g, b] = [c, x, 0];
+      } else if (h >= 60 && h < 120) {
+        [r, g, b] = [x, c, 0];
+      } else if (h >= 120 && h < 180) {
+        [r, g, b] = [0, c, x];
+      } else if (h >= 180 && h < 240) {
+        [r, g, b] = [0, x, c];
+      } else if (h >= 240 && h < 300) {
+        [r, g, b] = [x, 0, c];
+      } else {
+        [r, g, b] = [c, 0, x];
       }
-      return colour;
+      
+      const toHex = (value) => {
+        const hex = Math.round((value + m) * 255).toString(16).padStart(2, '0');
+        return hex;
+      };
+      
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     };
 
     const onOpen = () => {
@@ -229,7 +278,10 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
        * Appends message to chat log history *
        */
       const message = "You are connected.";
-      appendToHistory(message, defaultColor, true);
+      this.members_in_chat = this.jatos.groupMembers
+      //this.members_in_chat.push(String(this.jatos.groupMemberId));
+      console.log(this.members_in_chat)
+      appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_connected", timestamp: new Date().toISOString(), message: message });
       msgTextInput.focus();
     };
@@ -241,7 +293,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
        * *Disables send button and ability to send any more messages * 
        */
       const message = "You are disconnected.";
-      appendToHistory(message, defaultColor, true);
+      appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_disconnected", timestamp: new Date().toISOString(), message: message });
       msgTextInput.disabled = true;
       sendMsgButton.disabled = true;
@@ -253,7 +305,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
        * Appends error message to chat log history *
        */ 
       const message = "An error occurred: " + error;
-      appendToHistory(message, errorColor, true);
+      appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_error", timestamp: new Date().toISOString(), error: String(error) });
     };
 
@@ -268,8 +320,8 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
        */ 
       const receivedMsg = chatBundle && chatBundle.msg ? chatBundle.msg : "[empty message]";
       const msg = `${getTime()} - ${memberId}: ${receivedMsg}`;
-      const color = stringToColour(memberId);
-      appendToHistory(msg, color);
+      const color = stringToColour(String(memberId));
+      appendToHistory(msg, receivedMsg, memberId, color, false)
     };
 
     const onMemberOpen = (memberId: string) => {
@@ -278,7 +330,10 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
        * Appends ID of new member and timestamp to chat log history *
        */ 
       const message = `A new member joined: ${memberId}`;
-      appendToHistory(message, defaultColor, true);
+      this.members_in_chat.push(String(memberId));
+      console.log(this.members_in_chat)
+      appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
+      //this.trial_data.events.push({ type: "jatos_member_joined", timestamp: new Date().toISOString(), memberId: memberId });
     };
 
     const onMemberClose = (memberId: string) => {
@@ -287,7 +342,12 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
        * Appends ID of member who left and timestamp to chat log history *
        */ 
       const message = `${memberId} left`;
-      appendToHistory(message, defaultColor, true);
+      const remove_ppt_idx = this.members_in_chat.indexOf(memberId);
+        if (remove_ppt_idx > -1) { // only splice array when item is found
+          this.members_in_chat.splice(remove_ppt_idx, 1);
+        }
+      appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
+      //this.trial_data.events.push({ type: "jatos_member_left", timestamp: new Date().toISOString(), memberId: memberId });
     };
 
     // --- JATOS Integration ---
@@ -305,7 +365,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       // JATOS global error handler (distinct from channel errors)
       this.jatos.onError((error: string) => {
         const message = "jatos.onError (global): " + error;
-        appendToHistory(message, errorColor, true);
+        appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
         //this.trial_data.events.push({ type: "jatos_global_error", timestamp: new Date().toISOString(), error: String(error) });
       });
     });
@@ -342,24 +402,19 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
       } catch (e) {
         onError("Failed to send message via JATOS: " + (e.message || e));
       }
-      
-      appendToHistory(`${getTime()} - You: ${msg}`, stringToColour(memberId));
+ 
+      appendToHistory(`${getTime()} - You: ${msg}`, msg, memberId, stringToColour(String(memberId)));
     });
 
     endStudyButton.addEventListener('click', () => {
-       /** 
+      /** 
        * When 'End Study' button is clicked, organize the study data and store in a 'data' object and end the trial *
        */ 
-      const trial_data = {
-        chat_log: this.trial_data.chat_log,
-        chat_timestamps: this.trial_data.chat_timestamps, 
-        chat_senders: this.trial_data.chat_senders,
-        chat_messages: this.trial_data.chat_messages,
-        participant_id: (this.jatos && this.jatos.workerId) ? this.jatos.workerId : null,
-        group_member_id: this.getMemberId(this.jatos.groupMemberId),
-        group_id: (this.jatos && this.jatos.groupResultId) ? this.jatos.groupResultId : null,
-      };
-      this.jsPsych.finishTrial(trial_data);
+      //keep the participant in the group if they just decided to end the study
+      //this.jatos.leaveGroup();
+      console.log(this.saveData())
+      appendToHistory(`${getTime()} - You: ${msg}`, stringToColour(memberId));
+      this.jsPsych.finishTrial(this.saveData());
     });
 
     quitStudyButton.addEventListener('click', () => {
@@ -367,33 +422,43 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
        * When 'Quit Study' button is clicked, collect member ID, and replace trial data with "ppt_withdrew"*
        */ 
       var answer = confirm(this.params.quit_alert_text)
+      console.log(this.members_in_chat) 
       if (answer){
-        // get the member id of the participant who is quitting
-        let ppt_member_id = this.getMemberId(this.jatos.groupMemberId);
-        // boolean array, store True for match, False for no match
-        // this implementation allows the function to run in O(n)
-        let ppt_idx_bool = [];
-        this.trial_data.chat_senders.forEach((sender_id, index) => {
-          if (sender_id == ppt_member_id) {
-            ppt_idx_bool.push(true);
-          } else {
-            ppt_idx_bool.push(false);
-          }
-        });
-  
-        for (let i = 0; i < ppt_idx_bool.length; i++) {
-          if (ppt_idx_bool[i]) {
-            this.trial_data.chat_timestamps[i] = "ppt withdrew"
-            this.trial_data.chat_messages[i] = "ppt withdrew"
-          }  
+        const remove_ppt_idx = this.members_in_chat.indexOf(this.jatos.groupMemberId);
+        if (remove_ppt_idx > -1) { // only splice array when item is found
+          this.members_in_chat.splice(remove_ppt_idx, 1);
         }
-        //TODO: check if this works. specifically, if the rest of the data exists.
-        this.jsPsych.finishTrial()
+        console.log(this.saveData())
+        this.jsPsych.finishTrial(this.saveData());
+        this.jatos.leaveGroup();
       }
-    })
 
+    })
   }
 
+  private saveData() {
+    this.trial_data.chat_senders.forEach((sender_id, i) => {
+     if (!sender_id.includes("system") && !this.members_in_chat.includes(sender_id) ) {
+         this.trial_data.chat_timestamps[i] = "ppt withdrew"
+         this.trial_data.chat_messages[i] = "ppt withdrew"
+         this.trial_data.chat_log[i]["timestamp"] = "ppt withdrew"
+         this.trial_data.chat_log[i]["message"] = "ppt withdrew"
+         this.trial_data.chat_log[i]["full_message"] = "ppt withdrew"
+         this.trial_data.chat_log[i]["color"] = "ppt withdrew"
+       } 
+     });
+
+     const trial_data = {
+       chat_log: this.trial_data.chat_log,
+       chat_timestamps: this.trial_data.chat_timestamps, 
+       chat_senders: this.trial_data.chat_senders,
+       chat_messages: this.trial_data.chat_messages,
+       participant_id: (this.jatos && this.jatos.workerId) ? this.jatos.workerId : null,
+       group_member_id: (this.jatos && this.jatos.groupMemberId) ? this.jatos.groupMemberId : null,
+       group_id: (this.jatos && this.jatos.groupResultId) ? this.jatos.groupResultId : null,
+     }  
+     return trial_data
+   }
 }
 
 export default JatosGroupChatPlugin;
