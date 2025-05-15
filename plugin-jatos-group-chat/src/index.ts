@@ -168,7 +168,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
      */
     this.trial_data.chat_log = [];
 
-    const appendToHistory = (text: string, color: string, isEvent = false) => 
+    const appendToHistory = (text: string, color: string, isEvent = false) => {
        /** 
        * Defines constant that will iteratively append corresponding timestamps, messages, and member IDs to the chat log trial array *
        */
