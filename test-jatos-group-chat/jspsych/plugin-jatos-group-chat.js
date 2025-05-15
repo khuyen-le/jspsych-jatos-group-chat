@@ -148,6 +148,8 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
       };
       const onOpen = () => {
         const message = "You are connected.";
+        this.members_in_chat = this.jatos.groupMembers;
+        console.log(this.members_in_chat);
         appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
         msgTextInput.focus();
       };
@@ -170,10 +172,16 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
       };
       const onMemberOpen = (memberId) => {
         const message = `A new member joined: ${memberId}`;
+        this.members_in_chat.push(String(memberId));
+        console.log(this.members_in_chat);
         appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       };
       const onMemberClose = (memberId) => {
         const message = `${memberId} left`;
+        const remove_ppt_idx = this.members_in_chat.indexOf(memberId);
+        if (remove_ppt_idx > -1) {
+          this.members_in_chat.splice(remove_ppt_idx, 1);
+        }
         appendToHistory(`${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       };
       this.jatos.onLoad(() => {
@@ -217,44 +225,44 @@ var jsPsychPluginJatosGroupChat = (function (jspsych) {
         appendToHistory(`${getTime()} - You: ${msg}`, msg, memberId, stringToColour(String(memberId)));
       });
       endStudyButton.addEventListener("click", () => {
-        const trial_data = {
-          chat_log: this.trial_data.chat_log,
-          chat_timestamps: this.trial_data.chat_timestamps,
-          chat_senders: this.trial_data.chat_senders,
-          chat_messages: this.trial_data.chat_messages,
-          participant_id: this.jatos && this.jatos.workerId ? this.jatos.workerId : null,
-          group_member_id: this.jatos && this.jatos.groupMemberId ? this.jatos.groupMemberId : null,
-          group_id: this.jatos && this.jatos.groupResultId ? this.jatos.groupResultId : null
-        };
-        this.jsPsych.finishTrial(trial_data);
+        console.log(this.saveData());
+        this.jsPsych.finishTrial(this.saveData());
       });
-      quitStudyButton.addEventListener(
-        "click",
-        () => {
-          var answer = confirm(this.params.quit_alert_text);
-          if (answer) {
-            let ppt_member_id = String(this.jatos.groupMemberId);
-            let ppt_idx_bool = [];
-            this.trial_data.chat_senders.forEach((sender_id, index) => {
-              if (sender_id === ppt_member_id) {
-                ppt_idx_bool.push(true);
-              } else {
-                ppt_idx_bool.push(false);
-              }
-            });
-            for (let i = 0; i < ppt_idx_bool.length; i++) {
-              if (ppt_idx_bool[i]) {
-                this.trial_data.chat_timestamps[i] = "ppt withdrew";
-                this.trial_data.chat_messages[i] = "ppt withdrew";
-                this.trial_data.chat_log[i]["timestamp"] = "ppt withdrew";
-                this.trial_data.chat_log[i]["message"] = "ppt withdrew";
-                this.trial_data.chat_log[i]["color"] = "ppt withdrew";
-              }
-            }
+      quitStudyButton.addEventListener("click", () => {
+        var answer = confirm(this.params.quit_alert_text);
+        console.log(this.members_in_chat);
+        if (answer) {
+          const remove_ppt_idx = this.members_in_chat.indexOf(this.jatos.groupMemberId);
+          if (remove_ppt_idx > -1) {
+            this.members_in_chat.splice(remove_ppt_idx, 1);
           }
-          this.jsPsych.finishTrial();
+          console.log(this.saveData());
+          this.jsPsych.finishTrial(this.saveData());
+          this.jatos.leaveGroup();
         }
-      );
+      });
+    }
+    saveData() {
+      this.trial_data.chat_senders.forEach((sender_id, i) => {
+        if (!sender_id.includes("system") && !this.members_in_chat.includes(sender_id)) {
+          this.trial_data.chat_timestamps[i] = "ppt withdrew";
+          this.trial_data.chat_messages[i] = "ppt withdrew";
+          this.trial_data.chat_log[i]["timestamp"] = "ppt withdrew";
+          this.trial_data.chat_log[i]["message"] = "ppt withdrew";
+          this.trial_data.chat_log[i]["full_message"] = "ppt withdrew";
+          this.trial_data.chat_log[i]["color"] = "ppt withdrew";
+        }
+      });
+      const trial_data = {
+        chat_log: this.trial_data.chat_log,
+        chat_timestamps: this.trial_data.chat_timestamps,
+        chat_senders: this.trial_data.chat_senders,
+        chat_messages: this.trial_data.chat_messages,
+        participant_id: this.jatos && this.jatos.workerId ? this.jatos.workerId : null,
+        group_member_id: this.jatos && this.jatos.groupMemberId ? this.jatos.groupMemberId : null,
+        group_id: this.jatos && this.jatos.groupResultId ? this.jatos.groupResultId : null
+      };
+      return trial_data;
     }
   }
 

@@ -89,8 +89,11 @@ interface ChatData {
  */
 class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
   static info = info;
-  trial_data: ChatData;
-  jatos: any;
+  private trial_data: ChatData;
+  jatos: any; 
+
+  private params: TrialType<Info>;
+  private members_in_chat: string[];
 
   constructor(private jsPsych: JsPsych) {
     this.jsPsych = jsPsych;
@@ -104,7 +107,7 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     this.jatos = window.jatos; // Assuming JATOS is loaded globally
   }
 
-  private params: TrialType<Info>;
+
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
     this.params = trial;
@@ -180,6 +183,9 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
     const onOpen = () => {
       const message = "You are connected.";
+      this.members_in_chat = this.jatos.groupMembers
+      //this.members_in_chat.push(String(this.jatos.groupMemberId));
+      console.log(this.members_in_chat)
       appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_connected", timestamp: new Date().toISOString(), message: message });
       msgTextInput.focus();
@@ -209,12 +215,18 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
     const onMemberOpen = (memberId) => {
       const message = `A new member joined: ${memberId}`;
+      this.members_in_chat.push(String(memberId));
+      console.log(this.members_in_chat)
       appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_member_joined", timestamp: new Date().toISOString(), memberId: memberId });
     };
 
     const onMemberClose = (memberId) => {
       const message = `${memberId} left`;
+      const remove_ppt_idx = this.members_in_chat.indexOf(memberId);
+        if (remove_ppt_idx > -1) { // only splice array when item is found
+          this.members_in_chat.splice(remove_ppt_idx, 1);
+        }
       appendToHistory( `${getTime()} - ${message}`, message, "system" + this.jatos.groupResultId, defaultColor, true);
       //this.trial_data.events.push({ type: "jatos_member_left", timestamp: new Date().toISOString(), memberId: memberId });
     };
@@ -281,51 +293,51 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
     });
 
     endStudyButton.addEventListener('click', () => {
-      // this is a little complicated...
-      const trial_data = {
-        chat_log: this.trial_data.chat_log,
-        chat_timestamps: this.trial_data.chat_timestamps, 
-        chat_senders: this.trial_data.chat_senders,
-        chat_messages: this.trial_data.chat_messages,
-        participant_id: (this.jatos && this.jatos.workerId) ? this.jatos.workerId : null,
-        group_member_id: (this.jatos && this.jatos.groupMemberId) ? this.jatos.groupMemberId : null,
-        group_id: (this.jatos && this.jatos.groupResultId) ? this.jatos.groupResultId : null,
-      };
-      this.jsPsych.finishTrial(trial_data);
+      //keep the participant in the group if they just decided to end the study
+      //this.jatos.leaveGroup();
+      console.log(this.saveData())
+      this.jsPsych.finishTrial(this.saveData());
     });
 
     quitStudyButton.addEventListener('click', () => {
       var answer = confirm(this.params.quit_alert_text)
+      console.log(this.members_in_chat) 
       if (answer){
-        // get the member id of the participant who is quitting
-        let ppt_member_id = String(this.jatos.groupMemberId);
-        // boolean array, store True for match, False for no match
-        // this implementation allows the function to run in O(n)
-        let ppt_idx_bool = [];
-        this.trial_data.chat_senders.forEach((sender_id, index) => {
-          if (sender_id === ppt_member_id) {
-            ppt_idx_bool.push(true);
-          } else {
-            ppt_idx_bool.push(false);
-          }
-        });
-  
-        for (let i = 0; i < ppt_idx_bool.length; i++) {
-          if (ppt_idx_bool[i]) {
-            this.trial_data.chat_timestamps[i] = "ppt withdrew"
-            this.trial_data.chat_messages[i] = "ppt withdrew"
-            this.trial_data.chat_log[i]["timestamp"] = "ppt withdrew"
-            this.trial_data.chat_log[i]["message"] = "ppt withdrew"
-            this.trial_data.chat_log[i]["color"] = "ppt withdrew"
-            }
-          }  
+        const remove_ppt_idx = this.members_in_chat.indexOf(this.jatos.groupMemberId);
+        if (remove_ppt_idx > -1) { // only splice array when item is found
+          this.members_in_chat.splice(remove_ppt_idx, 1);
         }
-        //TODO: check if this works. specifically, if the rest of the data exists.
-        this.jsPsych.finishTrial()
+        console.log(this.saveData())
+        this.jsPsych.finishTrial(this.saveData());
+        this.jatos.leaveGroup();
       }
-    )
 
+    })
   }
 
+  private saveData() {
+    this.trial_data.chat_senders.forEach((sender_id, i) => {
+     if (!sender_id.includes("system") && !this.members_in_chat.includes(sender_id) ) {
+         this.trial_data.chat_timestamps[i] = "ppt withdrew"
+         this.trial_data.chat_messages[i] = "ppt withdrew"
+         this.trial_data.chat_log[i]["timestamp"] = "ppt withdrew"
+         this.trial_data.chat_log[i]["message"] = "ppt withdrew"
+         this.trial_data.chat_log[i]["full_message"] = "ppt withdrew"
+         this.trial_data.chat_log[i]["color"] = "ppt withdrew"
+       } 
+     });
+
+     const trial_data = {
+       chat_log: this.trial_data.chat_log,
+       chat_timestamps: this.trial_data.chat_timestamps, 
+       chat_senders: this.trial_data.chat_senders,
+       chat_messages: this.trial_data.chat_messages,
+       participant_id: (this.jatos && this.jatos.workerId) ? this.jatos.workerId : null,
+       group_member_id: (this.jatos && this.jatos.groupMemberId) ? this.jatos.groupMemberId : null,
+       group_id: (this.jatos && this.jatos.groupResultId) ? this.jatos.groupResultId : null,
+     }  
+     return trial_data
+   }
 }
+
 export default JatosGroupChatPlugin;
