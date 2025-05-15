@@ -27,7 +27,7 @@
   max-width: 700px;
   margin: 40px auto;
   font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
-  display: flex;
+  display: box;
   flex-direction: column;
   height: 80vh;
   overflow: hidden;
