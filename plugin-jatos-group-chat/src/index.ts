@@ -177,8 +177,60 @@ class JatosGroupChatPlugin implements JsPsychPlugin<Info> {
 
     // if printing messages, force memberid to be strings
     const stringToColour = (str) => {
-      var color = Math.floor((Math.abs(Math.sin(parseInt(str)) * 16777215)) % 16777215).toString(16);
-      return "#" + color;
+      // Similar to your original approach, using Math.sin for randomness
+      // Convert string to a numeric value first
+      let numericValue = 0;
+      for (let i = 0; i < str.length; i++) {
+        numericValue += str.charCodeAt(i);
+      }
+      
+      // Generate a random-feeling but deterministic color using sin
+      const randomVal = Math.abs(Math.sin(numericValue));
+      
+      // Generate HSL values with controlled ranges for readability
+      // Use the random value for the hue (0-360)
+      const h = Math.floor(randomVal * 360);
+      
+      // Keep saturation between 65-90% for vibrant but not overpowering colors
+      const s = 65 + Math.floor(randomVal * 25);
+      
+      // Keep lightness between 45-65% to ensure readability (not too dark/light)
+      const l = 45 + Math.floor(randomVal * 20);
+      
+      // Convert HSL to hex
+      return hslToHex(h, s, l);
+    };
+
+    // Helper function to convert HSL to hex
+    const hslToHex = (h, s, l) => {
+      s /= 100;
+      l /= 100;
+
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+      const m = l - c / 2;
+      
+      let r, g, b;
+      if (h >= 0 && h < 60) {
+        [r, g, b] = [c, x, 0];
+      } else if (h >= 60 && h < 120) {
+        [r, g, b] = [x, c, 0];
+      } else if (h >= 120 && h < 180) {
+        [r, g, b] = [0, c, x];
+      } else if (h >= 180 && h < 240) {
+        [r, g, b] = [0, x, c];
+      } else if (h >= 240 && h < 300) {
+        [r, g, b] = [x, 0, c];
+      } else {
+        [r, g, b] = [c, 0, x];
+      }
+      
+      const toHex = (value) => {
+        const hex = Math.round((value + m) * 255).toString(16).padStart(2, '0');
+        return hex;
+      };
+      
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     };
 
     const onOpen = () => {
